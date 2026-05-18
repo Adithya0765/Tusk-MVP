@@ -78,6 +78,15 @@ export interface DbConclusion {
   created_at: string
 }
 
+export interface PRDSection {
+  problemStatement: string
+  targetUsers: string
+  coreFeatures: string[]
+  successMetrics: string[]
+  outOfScope: string[]
+  mvpScope: string
+}
+
 export interface ConclusionData {
   executiveSummary: string
   keyPointsFor: string[]
@@ -87,4 +96,5 @@ export interface ConclusionData {
   confidenceLevel: 'Low' | 'Medium' | 'High'
   recommendedActions?: string[]
   improvementSuggestions?: string[]
+  prd?: PRDSection
 }

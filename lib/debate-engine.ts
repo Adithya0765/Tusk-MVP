@@ -109,34 +109,32 @@ async function callWithRetry<T>(
   throw new Error('unreachable')
 }
 
-const ANALYSIS_AGENT_A = (idea: string) => `You are a strategic builder tasked with strengthening an idea.
-Your job: Take the idea and make it stronger, more realistic, and more actionable.
+const ANALYSIS_AGENT_A = (idea: string) => `You are a strategic product builder. Your job is to take a raw idea and actively develop it into something concrete and viable.
 
 Rules:
-- In round 1: Break the idea into its core components. Identify what works, what's vague, and what's missing. Propose a concrete structure or framework to make it real.
-- In later rounds: Build on the previous discussion. Address gaps the other agent raised. Add specific implementation details, realistic timelines, resource requirements, or step-by-step plans.
-- NEVER just praise the idea. Always add something concrete — a mechanism, a process, a metric, a constraint, or a refinement.
-- Be pragmatic. If something is unrealistic, say how to make it realistic or what to replace it with.
+- In round 1: Identify the core value proposition. Define who it's for, what problem it solves, and what the simplest working version looks like. Propose a specific structure, mechanism, or framework that makes it real.
+- In later rounds: Build on what was discussed. Add implementation specifics — tech stack choices, go-to-market angle, monetization model, or a phased rollout plan. Make the idea more complete with each round.
+- ALWAYS add something new and concrete. Never just restate or praise.
+- If something is unrealistic, replace it with a realistic alternative — don't just flag it.
 - Keep response to 150-200 words.
-- Reference the other agent's points and respond to them with solutions, not defensiveness.
+- Directly respond to the stress-tester's concerns with solutions, not defensiveness.
 
 Idea: ${idea}`
 
-const ANALYSIS_AGENT_B = (idea: string) => `You are a stress-tester and realist. Your job is to pressure-test an idea so it becomes bulletproof.
-You are NOT here to tear it down — you are here to make it survive contact with reality.
+const ANALYSIS_AGENT_B = (idea: string) => `You are a pragmatic stress-tester. Your job is to pressure-test the idea so it becomes bulletproof — not to kill it.
 
 Rules:
-- In round 1: Identify the weakest points, hidden assumptions, and practical obstacles. For each problem, suggest a specific way to address it or a pivot that would work better.
-- In later rounds: Focus on the refinements the other agent proposed. Are they actually feasible? What could go wrong? Suggest improvements, alternatives, or safeguards.
-- NEVER just criticize. Every concern must come with a realistic fix, workaround, or validation step.
-- Ground your feedback in real-world constraints: cost, time, skills required, market conditions, user behavior, technical feasibility.
+- In round 1: Find the 2-3 most critical weak points: hidden assumptions, market risks, technical blockers, or cost traps. For each one, propose a specific fix, pivot, or validation step that would resolve it.
+- In later rounds: Evaluate whether the builder's solutions actually hold up. Push on feasibility — what would this cost, how long would it take, what skills are needed? Suggest concrete alternatives or safeguards where the plan is still shaky.
+- NEVER just criticize. Every concern must come with a realistic path forward.
+- Ground everything in real-world constraints: budget, timeline, user behavior, competition, technical complexity.
 - Keep response to 150-200 words.
-- Reference the other agent's points and push them further.
+- Reference the builder's specific proposals and push them further.
 
 Idea: ${idea}`
 
-const ANALYSIS_CONCLUSION = `You are a pragmatic advisor reviewing a session where two agents worked to strengthen an idea.
-Generate a structured assessment with actionable recommendations. Be honest and specific. Do NOT give generic encouragement.
+const ANALYSIS_CONCLUSION = `You are a pragmatic product advisor reviewing a session where two agents worked to strengthen an idea.
+Generate a structured assessment. Be honest and specific. Do NOT give generic encouragement.
 
 CRITICAL: Your entire response must be ONLY valid JSON. No text before or after. No markdown. No explanation.
 
@@ -145,11 +143,28 @@ Return ONLY this exact JSON structure:
   "executiveSummary": "2-3 sentences summarizing the refined idea and its current state",
   "keyPointsFor": ["concrete strength 1", "concrete strength 2", "concrete strength 3"],
   "keyPointsAgainst": ["remaining risk 1", "remaining risk 2", "remaining risk 3"],
-  "unresolvedTensions": ["open question or trade-off 1"],
+  "unresolvedTensions": ["open question or trade-off 1", "open question 2"],
   "finalVerdict": "specific assessment: what the idea looks like after refinement, what the next concrete step should be, and what would make or break it",
   "confidenceLevel": "Medium",
   "recommendedActions": ["specific action 1 with concrete steps", "specific action 2 with concrete steps", "specific action 3 with concrete steps"],
   "improvementSuggestions": ["specific improvement 1 with how to implement it", "specific improvement 2 with how to implement it"]
+}
+
+Do NOT include any text outside the JSON object. Start with { and end with }.`
+
+const PRD_SYSTEM_PROMPT = `You are a senior product manager writing a Product Requirements Document (PRD) based on a refined idea.
+Be specific, realistic, and actionable. No fluff.
+
+CRITICAL: Your entire response must be ONLY valid JSON. No text before or after. No markdown. No explanation.
+
+Return ONLY this exact JSON structure:
+{
+  "problemStatement": "1-2 sentences: the specific problem this idea solves and why it matters now",
+  "targetUsers": "who exactly will use this — be specific about demographics, context, and pain points",
+  "coreFeatures": ["feature 1: what it does and why it is essential", "feature 2: what it does and why it is essential", "feature 3: what it does and why it is essential", "feature 4: what it does and why it is essential"],
+  "successMetrics": ["measurable metric 1 with target number and timeframe", "measurable metric 2 with target number and timeframe", "measurable metric 3 with target number and timeframe"],
+  "outOfScope": ["thing NOT in v1 and the reason why", "thing 2 and reason", "thing 3 and reason"],
+  "mvpScope": "1-2 sentences: the smallest shippable version that validates the core assumption"
 }
 
 Do NOT include any text outside the JSON object. Start with { and end with }.`
@@ -329,6 +344,36 @@ export async function runDebateAndPersist(
     )
 
     const conclusion = parseConclusionJSON(conclusionRaw)
+
+    // For analysis mode, make a separate PRD call so neither prompt is overloaded
+    if (mode === 'analysis') {
+      console.log(`[debate] Generating PRD...`)
+      try {
+        const prdRaw = await callWithRetry(() =>
+          callConclusion(
+            PRD_SYSTEM_PROMPT,
+            `Idea: ${topic}\n\nRefined discussion transcript:\n${fullTranscript}`
+          )
+        )
+        const prdCleaned = prdRaw
+          .replace(/^```json\s*/i, '')
+          .replace(/```\s*$/, '')
+          .trim()
+        let prdStart = prdCleaned.indexOf('{')
+        let prdEnd = prdCleaned.lastIndexOf('}')
+        if (prdStart !== -1 && prdEnd !== -1 && prdEnd > prdStart) {
+          try {
+            conclusion.prd = JSON.parse(prdCleaned.slice(prdStart, prdEnd + 1))
+            console.log(`[debate] PRD generated successfully`)
+          } catch {
+            console.error('[debate] PRD JSON parse failed, skipping')
+          }
+        }
+      } catch (prdErr: any) {
+        console.error('[debate] PRD generation failed:', prdErr?.message)
+        // Non-fatal — conclusion still saves without PRD
+      }
+    }
 
     insertConclusion(sessionId, JSON.stringify(conclusion))
     updateSession(sessionId, { status: 'complete' })

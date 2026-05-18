@@ -109,7 +109,7 @@ export default function DebatePage() {
         }
       }))
       
-      setTimeout(() => setActiveSpeaker(null), latestTurn.content.length * 20 + 500)
+      setTimeout(() => setActiveSpeaker(null), latestTurn.content.length * 28 + 500)
     }
     prevTurnCountRef.current = newTurnCount
     
@@ -236,7 +236,7 @@ export default function DebatePage() {
               background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: 'rgba(59,130,246,0.8)'
             }}>
               <Sparkles className="size-3" />
-              Compiling verdict...
+              {session.mode === 'analysis' ? 'Generating report…' : 'Compiling verdict...'}
             </div>
           )}
           <div className="size-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
@@ -292,7 +292,7 @@ export default function DebatePage() {
                       <TypewriterText
                         key={typewriterState.key}
                         text={typewriterState.text}
-                        speed={12}
+                        speed={28}
                         className="text-sm text-white/80 leading-relaxed whitespace-pre-wrap"
                       />
                     ) : latestTurn ? (
@@ -345,7 +345,7 @@ export default function DebatePage() {
                     </div>
                     <div className="text-xs text-white/60 leading-relaxed">
                       {shouldTypewriter ? (
-                        <TypewriterText key={typewriterState.key} text={typewriterState.text} speed={15} className="whitespace-pre-wrap" />
+                        <TypewriterText key={typewriterState.key} text={typewriterState.text} speed={22} className="whitespace-pre-wrap" />
                       ) : (
                         <span className="whitespace-pre-wrap">{t.content}</span>
                       )}
@@ -380,7 +380,7 @@ export default function DebatePage() {
               <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
                 <h2 className="text-lg font-bold font-mono text-white/90 flex items-center gap-2">
                   <Sparkles className="size-5 text-white/60" />
-                  Verdict
+                  {session.mode === 'analysis' ? 'Refinement Report' : 'Verdict'}
                 </h2>
                 <Link
                   href="/dashboard"

@@ -217,10 +217,10 @@ export default function NewDebatePage() {
           transition={{ duration: 0.4, delay: 0.3 }}
           className="mt-4 grid grid-cols-2 gap-px bg-white/[0.06]"
         >
-          {[
-            { label: 'FOR',     name: 'Gemini' },
-            { label: 'AGAINST', name: 'Grok'   },
-          ].map(a => (
+          {(mode === 'analysis'
+            ? [{ label: 'BUILDER', name: 'Gemini' }, { label: 'STRESS TESTER', name: 'Grok' }]
+            : [{ label: 'FOR', name: 'Gemini' }, { label: 'AGAINST', name: 'Grok' }]
+          ).map(a => (
             <div key={a.label} className="px-4 py-3 text-center bg-background" style={{ background: 'rgba(255,255,255,0.02)' }}>
               <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/25 mb-1">{a.label}</p>
               <p className="text-xs font-mono text-white/55">{a.name}</p>

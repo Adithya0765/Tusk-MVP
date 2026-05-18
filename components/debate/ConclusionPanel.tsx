@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Download, FileText, Share2, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Download, FileText, Share2, CheckCircle2, AlertTriangle, BookOpen, Target, BarChart2, XCircle, Zap } from 'lucide-react'
 import { motion } from 'motion/react'
 import type { ConclusionData, DbConclusion, DbTurn } from '@/types'
 
@@ -25,7 +25,7 @@ function buildMarkdown(topic: string, turns: DbTurn[], data: ConclusionData, mod
       : (mode === 'analysis' ? 'Stress Tester' : 'AGAINST')
     L.push(`### Round ${t.round_num} — ${label}`, '', t.content, '')
   }
-  L.push('---', '', '## Conclusion', '', '### Executive Summary', '', data.executiveSummary, '')
+  L.push('---', '', '## Assessment', '', '### Executive Summary', '', data.executiveSummary, '')
   const forLabel = mode === 'analysis' ? 'What Works Well' : 'Key Points For'
   const againstLabel = mode === 'analysis' ? 'Remaining Risks' : 'Key Points Against'
   L.push(`### ${forLabel}`, ''); for (const p of data.keyPointsFor) L.push(`- ${p}`)
@@ -38,6 +38,23 @@ function buildMarkdown(topic: string, turns: DbTurn[], data: ConclusionData, mod
   if (mode === 'analysis' && data.improvementSuggestions?.length) {
     L.push('', '### How to Improve Further', ''); for (const s of data.improvementSuggestions) L.push(`- ${s}`)
   }
+  return L.join('\n')
+}
+
+function buildPRDMarkdown(topic: string, data: ConclusionData): string {
+  const prd = data.prd
+  if (!prd) return `# PRD: ${topic}\n\nPRD data not available.`
+  const L: string[] = []
+  L.push(`# Product Requirements Document`, '', `## ${topic}`, '', '---', '')
+  L.push('## Problem Statement', '', prd.problemStatement, '')
+  L.push('## Target Users', '', prd.targetUsers, '')
+  L.push('## Core Features', '')
+  prd.coreFeatures.forEach((f, i) => L.push(`### ${i + 1}. ${f}`, ''))
+  L.push('## Success Metrics', '')
+  for (const m of prd.successMetrics) L.push(`- ${m}`)
+  L.push('', '## Out of Scope (v1)', '')
+  for (const o of prd.outOfScope) L.push(`- ${o}`)
+  L.push('', '## MVP Scope', '', prd.mvpScope)
   return L.join('\n')
 }
 
@@ -83,6 +100,79 @@ export function ConclusionPanel({ conclusion, turns, topic, shareSlug, hideActio
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = `tusk-session-${shareSlug}.md`; a.click()
     URL.revokeObjectURL(url)
+  }
+
+  function handleDownloadPRDMarkdown() {
+    const blob = new Blob([buildPRDMarkdown(topic, data)], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `tusk-prd-${shareSlug}.md`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleDownloadPRDPDF() {
+    if (!data.prd) return
+    const prd = data.prd
+    const { jsPDF } = await import('jspdf')
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+    const W = doc.internal.pageSize.getWidth()
+    const H = doc.internal.pageSize.getHeight()
+    const margin = 50
+    const maxW = W - margin * 2
+    let y = margin
+
+    function addPageIfNeeded(spaceNeeded: number) {
+      if (y + spaceNeeded > H - margin) { doc.addPage(); y = margin }
+    }
+    function add(text: string, size: number, bold: boolean, color: [number, number, number], spacing?: number) {
+      addPageIfNeeded(size * 2)
+      doc.setFontSize(size); doc.setFont('helvetica', bold ? 'bold' : 'normal')
+      doc.setTextColor(color[0], color[1], color[2])
+      const lines = doc.splitTextToSize(text, maxW) as string[]
+      for (const line of lines) { addPageIfNeeded(size * 1.5); doc.text(line, margin, y); y += size * 1.5 }
+      if (spacing) y += spacing
+    }
+    function addBullet(text: string, size: number, color: [number, number, number]) {
+      addPageIfNeeded(size * 1.5)
+      doc.setFontSize(size); doc.setFont('helvetica', 'normal'); doc.setTextColor(color[0], color[1], color[2])
+      const lines = doc.splitTextToSize('\u2022  ' + text, maxW - 16) as string[]
+      for (const line of lines) { addPageIfNeeded(size * 1.5); doc.text(line, margin + 8, y); y += size * 1.5 }
+    }
+
+    // Header
+    add('Product Requirements Document', 20, true, [30, 30, 30], 6)
+    add(topic, 13, false, [80, 80, 80], 12)
+    doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.5); doc.line(margin, y, W - margin, y); y += 20
+
+    add('Problem Statement', 13, true, [50, 50, 50], 4)
+    add(prd.problemStatement, 10, false, [60, 60, 60], 14)
+
+    add('Target Users', 13, true, [50, 50, 50], 4)
+    add(prd.targetUsers, 10, false, [60, 60, 60], 14)
+
+    add('Core Features', 13, true, [50, 50, 50], 4)
+    prd.coreFeatures.forEach((f, i) => { add(`${i + 1}.  ${f}`, 10, false, [60, 60, 60], 4) })
+    y += 8
+
+    add('Success Metrics', 13, true, [50, 50, 50], 4)
+    for (const m of prd.successMetrics) addBullet(m, 10, [60, 60, 60])
+    y += 8
+
+    add('Out of Scope (v1)', 13, true, [50, 50, 50], 4)
+    for (const o of prd.outOfScope) addBullet(o, 10, [60, 60, 60])
+    y += 8
+
+    // MVP scope box
+    addPageIfNeeded(70)
+    doc.setFillColor(240, 248, 244)
+    doc.roundedRect(margin, y, maxW, 54, 3, 3, 'F')
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(34, 130, 94)
+    doc.text('MVP Scope', margin + 8, y + 14)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60)
+    const mvpLines = doc.splitTextToSize(prd.mvpScope, maxW - 16) as string[]
+    let my = y + 26
+    for (const line of mvpLines) { doc.text(line, margin + 8, my); my += 12 }
+
+    doc.save(`tusk-prd-${shareSlug}.pdf`)
   }
 
   async function handleDownloadPDF() {
@@ -151,8 +241,8 @@ export function ConclusionPanel({ conclusion, turns, topic, shareSlug, hideActio
     doc.line(margin, y, W - margin, y)
     y += 16
 
-    // Conclusion section
-    add('Conclusion', 14, true, [50, 50, 50], 8)
+    // Assessment section
+    add(mode === 'analysis' ? 'Assessment' : 'Conclusion', 14, true, [50, 50, 50], 8)
 
     add('Executive Summary', 12, true, [70, 70, 70], 4)
     add(data.executiveSummary, 10, false, [60, 60, 60], 12)
@@ -188,19 +278,15 @@ export function ConclusionPanel({ conclusion, turns, topic, shareSlug, hideActio
       doc.text(line, margin + 6, vy)
       vy += 12
     }
-    // Confidence badge
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(8)
     doc.setTextColor(120, 120, 120)
     doc.text(`Confidence: ${data.confidenceLevel}`, margin + 6, vy + 6)
+    y = vy + 24
 
-    // Analysis-only sections
     if (mode === 'analysis' && data.recommendedActions?.length) {
       addPageIfNeeded(40)
-      doc.setDrawColor(200, 200, 200)
-      doc.setLineWidth(0.5)
-      doc.line(margin, y, W - margin, y)
-      y += 16
+      doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.5); doc.line(margin, y, W - margin, y); y += 16
       add('Recommended Next Steps', 14, true, [34, 130, 94], 8)
       for (let i = 0; i < data.recommendedActions.length; i++) {
         add(`${i + 1}. ${data.recommendedActions[i]}`, 10, false, [60, 60, 60], 4)
@@ -245,8 +331,14 @@ export function ConclusionPanel({ conclusion, turns, topic, shareSlug, hideActio
     >
       {!hideActions && (
         <motion.div variants={item} className="flex flex-wrap gap-2 justify-end pb-1">
-          <ActionBtn onClick={handleDownloadMarkdown} icon={FileText} label="Markdown" />
+          <ActionBtn onClick={handleDownloadMarkdown} icon={FileText} label="Transcript" />
           <ActionBtn onClick={handleDownloadPDF} icon={Download} label="PDF" />
+          {mode === 'analysis' && data.prd && (
+            <>
+              <ActionBtn onClick={handleDownloadPRDMarkdown} icon={BookOpen} label="PRD .md" />
+              <ActionBtn onClick={handleDownloadPRDPDF} icon={Download} label="PRD PDF" />
+            </>
+          )}
           <ActionBtn onClick={handleShare} disabled={copying} icon={Share2} label={copying ? 'Copying…' : 'Share'} />
         </motion.div>
       )}
@@ -366,6 +458,100 @@ export function ConclusionPanel({ conclusion, turns, topic, shareSlug, hideActio
               </li>
             ))}
           </ul>
+        </motion.div>
+      )}
+
+      {/* PRD - analysis mode only */}
+      {mode === 'analysis' && data.prd && (
+        <motion.div variants={item} className="space-y-px overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+          {/* PRD Header */}
+          <div className="relative px-5 py-4 overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+            <div className="absolute top-0 left-0 right-0 h-px" style={{
+              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+            }} />
+            <div className="flex items-center gap-2">
+              <BookOpen className="size-4 text-white/50" />
+              <p className="text-xs font-mono uppercase tracking-[0.2em] text-white/70 font-bold">Product Requirements Document</p>
+            </div>
+          </div>
+
+          {/* Problem Statement */}
+          <div className="px-5 py-4" style={{ background: 'rgba(255,255,255,0.02)' }}>
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="size-3.5 text-white/30" />
+              <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/30">Problem Statement</p>
+            </div>
+            <p className="text-sm text-white/75 leading-relaxed font-mono">{data.prd.problemStatement}</p>
+          </div>
+
+          {/* Target Users */}
+          <div className="px-5 py-4" style={{ background: 'rgba(255,255,255,0.02)' }}>
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="size-3.5 text-white/30" />
+              <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/30">Target Users</p>
+            </div>
+            <p className="text-sm text-white/75 leading-relaxed font-mono">{data.prd.targetUsers}</p>
+          </div>
+
+          {/* Core Features */}
+          <div className="px-5 py-4" style={{ background: 'rgba(255,255,255,0.02)' }}>
+            <div className="flex items-center gap-2 mb-3">
+              <Zap className="size-3.5 text-white/30" />
+              <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/30">Core Features</p>
+            </div>
+            <ul className="space-y-2.5">
+              {data.prd.coreFeatures.map((f, i) => (
+                <li key={i} className="flex gap-2.5 text-xs text-white/65 font-mono leading-relaxed">
+                  <span className="shrink-0 flex items-center justify-center size-4 rounded text-[9px] font-bold mt-0.5" style={{
+                    background: 'rgba(255,255,255,0.08)',
+                    color: 'rgba(255,255,255,0.5)',
+                  }}>{i + 1}</span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Success Metrics + Out of Scope side by side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-white/[0.06]">
+            <div className="px-5 py-4" style={{ background: 'rgba(255,255,255,0.02)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart2 className="size-3.5 text-white/30" />
+                <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/30">Success Metrics</p>
+              </div>
+              <ul className="space-y-2">
+                {data.prd.successMetrics.map((m, i) => (
+                  <li key={i} className="flex gap-2 text-xs text-white/60 font-mono leading-relaxed">
+                    <CheckCircle2 className="size-3.5 shrink-0 mt-0.5 text-white/20" />
+                    {m}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="px-5 py-4" style={{ background: 'rgba(255,255,255,0.02)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <XCircle className="size-3.5 text-white/30" />
+                <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/30">Out of Scope (v1)</p>
+              </div>
+              <ul className="space-y-2">
+                {data.prd.outOfScope.map((o, i) => (
+                  <li key={i} className="flex gap-2 text-xs text-white/60 font-mono leading-relaxed">
+                    <span className="text-white/20 shrink-0">—</span>
+                    {o}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* MVP Scope */}
+          <div className="relative px-5 py-4 overflow-hidden" style={{ background: 'rgba(34,197,94,0.04)' }}>
+            <div className="absolute top-0 left-0 right-0 h-px" style={{
+              background: 'linear-gradient(90deg, transparent, rgba(34,197,94,0.25), transparent)',
+            }} />
+            <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/30 mb-2">MVP Scope</p>
+            <p className="text-sm text-white/75 leading-relaxed font-mono">{data.prd.mvpScope}</p>
+          </div>
         </motion.div>
       )}
     </motion.div>

@@ -28,14 +28,14 @@ export function SessionList({ sessions }: SessionListProps) {
           </svg>
         </div>
         <p className="text-xs font-mono text-white/30 uppercase tracking-widest mb-5">
-          No debates yet
+          No sessions yet
         </p>
         <Link
           href="/debate/new"
           className="btn-primary inline-flex items-center gap-2 px-5 py-2 text-xs"
         >
           <Plus className="size-3.5" />
-          Start your first debate
+          Start your first session
         </Link>
       </motion.div>
     )

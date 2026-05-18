@@ -1,11 +1,14 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
+import { TypewriterText } from './TypewriterText'
 import type { Agent, DbTurn } from '@/types'
 
 interface TurnBubbleProps {
   turn: DbTurn
   agentNames: { agentA: string; agentB: string }
+  animate?: boolean
 }
 
 const CONFIG: Record<Agent, { label: string; align: string }> = {
@@ -13,10 +16,18 @@ const CONFIG: Record<Agent, { label: string; align: string }> = {
   B: { label: 'AGAINST', align: 'items-end'   },
 }
 
-export function TurnBubble({ turn, agentNames }: TurnBubbleProps) {
+export function TurnBubble({ turn, agentNames, animate = true }: TurnBubbleProps) {
   const cfg = CONFIG[turn.agent]
   const agentName = turn.agent === 'A' ? agentNames.agentA : agentNames.agentB
   const isFor = turn.agent === 'A'
+  const [showTypewriter, setShowTypewriter] = useState(animate)
+
+  useEffect(() => {
+    if (animate) {
+      const timer = setTimeout(() => setShowTypewriter(false), turn.content.length * 20 + 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [animate, turn.content.length])
 
   return (
     <div className={`flex flex-col ${cfg.align}`}>
@@ -29,7 +40,6 @@ export function TurnBubble({ turn, agentNames }: TurnBubbleProps) {
           border: '1px solid rgba(255,255,255,0.07)',
         }}
       >
-        {/* Directional top accent */}
         <div className="absolute top-0 left-0 right-0 h-px" style={{
           background: isFor
             ? 'linear-gradient(90deg, rgba(255,255,255,0.2) 0%, transparent 60%)'
@@ -48,7 +58,16 @@ export function TurnBubble({ turn, agentNames }: TurnBubbleProps) {
         </div>
 
         <p className="text-sm leading-relaxed whitespace-pre-wrap text-white/70">
-          {turn.content}
+          {showTypewriter ? (
+            <TypewriterText
+              key={`tw-${turn.id}`}
+              text={turn.content}
+              speed={18}
+              className="whitespace-pre-wrap"
+            />
+          ) : (
+            turn.content
+          )}
         </p>
 
         {turn.token_count != null && (

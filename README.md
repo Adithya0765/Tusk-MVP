@@ -1,9 +1,9 @@
-# v0 IRL Event Landing Template
+# TUSK — AI Debate & Analysis Sessions
 
-A customizable landing page template for hosting v0 IRL events around the world. This template was originally created for the "Prompt to Production" events and includes an interactive 3D lanyard generator, event agenda, sponsor showcase, and registration CTAs.
+TUSK is a web app where two AI models debate or analyze a topic in real-time, and you watch it unfold like a live meeting. Pick a topic, choose debate or analysis mode, and watch Gemini and Grok go back and forth. When they're done, you get a structured verdict with key points, tensions, and a final assessment.
 
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app)
 [![Built with Next.js](https://img.shields.io/badge/Built%20with-Next.js-black?style=for-the-badge&logo=nextdotjs)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org)
 
 ---
 
@@ -11,269 +11,92 @@ A customizable landing page template for hosting v0 IRL events around the world.
 
 - [Features](#features)
 - [Quick Start](#quick-start)
-- [Customization Guide](#customization-guide)
-  - [1. Event Information](#1-event-information)
-  - [2. Lanyard Customization](#2-lanyard-customization)
-  - [3. Sponsors and Partners](#3-sponsors-and-partners)
-  - [4. Agenda](#4-agenda)
-  - [5. Metadata and SEO](#5-metadata-and-seo)
-  - [6. Footer Links](#6-footer-links)
-- [Creating Custom Lanyard Textures](#creating-custom-lanyard-textures)
+- [How It Works](#how-it-works)
+- [Meeting Experience](#meeting-experience)
 - [Project Structure](#project-structure)
+- [Tech Stack](#tech-stack)
+- [Configuration](#configuration)
 - [Deployment](#deployment)
-- [Credits](#credits)
 
 ---
 
 ## Features
 
-- Interactive 3D lanyard with physics simulation (React Three Fiber + Rapier)
-- Personalized badge generator with dark/light variants
-- Export badge as PNG
-- Shareable lanyard URLs with encryption
-- Animated text effects and transitions
-- Responsive design (mobile-first)
-- Dithered animated background
-- Sponsor/partner logo carousel
+- **Live AI debates** — two models argue FOR and AGAINST a topic in real-time
+- **Analysis mode** — models explore strengths and challenges of an idea instead of debating
+- **Typewriter effect** — watch each agent's response appear character-by-character as they "speak"
+- **Active speaker detection** — the current speaker's panel glows and shows a "Speaking" badge
+- **Live transcript sidebar** — scrollable chat view of the full conversation
+- **Progress tracking** — navbar shows current round and visual progress bar
+- **Auto-verdict** — when the debate ends, the verdict overlay appears automatically
+- **Structured verdict** — executive summary, key points for/against, unresolved tensions, confidence level
+- **Export** — download as Markdown or PDF, share via link
+- **Multi-provider AI** — Groq, Gemini, OpenRouter, Claude (configurable)
+- **Tier-based quotas** — free, starter, and pro tiers with different round limits
 
 ---
 
 ## Quick Start
 
-### Option 1: Fork on GitHub
-
-1. Fork this repository
-2. Clone your fork locally
-3. Install dependencies: `npm install` or `pnpm install`
-4. Run the development server: `npm run dev`
-5. Open [http://localhost:3000](http://localhost:3000)
-
-### Option 2: Use with v0
-
-1. Go to [v0.app](https://v0.app)
-2. Import this repository or start a new chat
-3. Make changes using natural language prompts
-4. Deploy directly to Vercel
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
+4. Open [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## Customization Guide
+## How It Works
 
-### 1. Event Information
-
-#### Hero Section (`components/hero-section.tsx`)
-
-Update the main event details:
-
-```tsx
-// Line ~35-38: Event date and location
-<DecryptedText
-    text="Thursday February 5th, 2026 - New York City"  // <-- Change this
-    ...
-/>
-
-// Lines ~40-50: Event title (currently "Prompt to Production")
-<TextEffect ...>
-    Prompt           // <-- Change line 1
-</TextEffect>
-<TextEffect ...>
-    to Production    // <-- Change line 2
-</TextEffect>
-
-// Lines ~52-57: Event description
-<TextEffect ...>
-    v0 is getting ready to launch its biggest product update yet...  // <-- Change this
-</TextEffect>
-
-// Lines ~66-82: CTA buttons
-<Button ...>
-    <Link href="#link">  // <-- Update registration link
-        Register Now
-    </Link>
-</Button>
-<Button ...>
-    <Link href="#link">  // <-- Update contact link
-        Contact Host
-    </Link>
-</Button>
+```
+User enters a topic + picks mode (Debate or Analysis)
+        │
+        ▼
+POST /api/debate/start → creates session (status: "processing")
+        │
+        ▼
+runDebateAndPersist() fires in background
+        │
+        ├── Round 1: Agent A responds → persisted immediately
+        ├── Round 1: Agent B responds → persisted immediately
+        ├── Round 2: Agent A responds → persisted immediately
+        ├── Round 2: Agent B responds → persisted immediately
+        │   ...
+        │
+        └── Conclusion agent generates structured JSON verdict
+                │
+                ▼
+        Session marked "complete"
 ```
 
-### 2. Lanyard Customization
-
-#### Changing City and Date on the Lanyard
-
-The lanyard displays dynamic city and date text. Update these in `components/lanyard-with-controls.tsx`:
-
-```tsx
-// Lines 189-190 in the CardTemplate component
-<CardTemplate
-    ref={cardTemplateRef}
-    userName={inputValue}
-    variant={cardVariant}
-    onTextureReady={handleTextureReady}
-    city='guadalajara'    // <-- Change to your city
-    date='05.02.2026'     // <-- Change to your event date (DD.MM.YYYY format)
-/>
-```
-
-#### Social Share Message (`components/lanyard-with-controls.tsx`)
-
-Update the share message for social media (around line 113):
-
-```tsx
-const shareMessage = appliedName
-    ? `I'll be at @v0 Prompt to Production Guadalajara! Check out my personalized lanyard`  // <-- Change this
-    : `Check out v0 IRL Guadalajara! Create your personalized event lanyard`;  // <-- And this
-```
-
-#### Export Filename (`components/card-template.tsx`)
-
-Update the downloaded file name (around line 159):
-
-```tsx
-link.download = `v0-guadalajara-${userName || "card"}.png`;  // <-- Change "guadalajara" to your city
-```
-
-#### OG Images for Social Media (`app/api/og/route.tsx`)
-
-When someone shares a personalized lanyard, dynamic Open Graph images are generated. Update the event details (around lines 57-58):
-
-```tsx
-const EVENT_CITY = "GUADALAJARA";  // <-- Change to your city (uppercase)
-const EVENT_DATE = "FEBRUARY 2026";  // <-- Change to your event date
-```
-
-These values appear on the OG images when sharing lanyard URLs on Twitter, Facebook, LinkedIn, Discord, etc.
-
-### 3. Sponsors and Partners
-
-#### Logo Carousel (`components/hero-section.tsx`)
-
-Add or modify sponsor logos in the InfiniteSlider (around line 92):
-
-```tsx
-<InfiniteSlider speedOnHover={20} speed={40} gap={112}>
-    <div className="flex items-center">
-        <V0Icon size={35} ... />
-    </div>
-    <div className="flex items-center">
-        <VercelWordmarkIcon size={20} ... />
-    </div>
-    <div className="flex items-center">
-        <GlobantLogoIcon size={20} ... />  // <-- Add/remove sponsor icons
-    </div>
-    // Add more sponsors here
-</InfiniteSlider>
-```
-
-To add a new sponsor icon:
-1. Create the icon component in `components/icons/`
-2. Import it in `hero-section.tsx`
-3. Add it to the InfiniteSlider
-
-### 4. Agenda
-
-#### Event Schedule (`components/agenda.tsx`)
-
-Modify the agenda items (around line 35):
-
-```tsx
-<div className="pb-6">
-    <div className="font-medium space-x-2">
-        <span className='text-muted-foreground font-mono'>11:00</span>  // <-- Time
-        <span>Welcome Video</span>  // <-- Title
-    </div>
-    <p className="text-muted-foreground mt-4">
-        A special welcome from the v0 Team  // <-- Description
-    </p>
-</div>
-// Repeat for each agenda item
-```
-
-### 5. Metadata and SEO
-
-#### Page Metadata (`app/layout.tsx`)
-
-Update the site metadata (around line 14):
-
-```tsx
-export const metadata: Metadata = {
-    title: 'v0 IRL — Prompt to Production | NYC February 5th, 2026',  // <-- Page title
-    description: 'v0 is launching its biggest product update yet...',  // <-- Meta description
-    generator: 'v0.app',
-}
-```
-
-### 6. Footer Links
-
-#### Footer Navigation (`components/footer.tsx`)
-
-Update the footer links array (around line 5):
-
-```tsx
-const links = [
-    { title: 'Vercel', href: 'https://vercel.com/' },
-    { title: 'v0', href: 'https://v0.dev/' },
-    { title: 'Meetup SDK', href: 'https://meetup-sdk.vercel.com/' },
-    { title: 'v0 IRL', href: 'https://v0.app/irl' },
-    // Add your own links here
-]
-```
+The client polls `/api/debate/[id]` every 2 seconds. As each turn is persisted, the UI detects the new turn and triggers the typewriter effect on both the agent panel and the chat sidebar.
 
 ---
 
-## Creating Custom Lanyard Textures
+## Meeting Experience
 
-The lanyard uses base texture images located in the public folder:
+### During the Debate
 
-- `/card.glb` - Lanyard 3D model, it includes the default card texture (dark) without customization
-- `/card-base-dark.png` - Dark variant card texture
-- `/card-base-light.png` - Light variant card texture
+The meeting page (`/debate/[id]`) is a **fixed-height, no-scroll** layout:
 
-### Using the Existing Textures
+- **Two agent panels** side-by-side showing each model's latest response with a live typewriter effect
+- **Active speaker glow** — the panel of the agent currently "typing" gets a subtle glow and a "Speaking" badge
+- **Progress bar** in the navbar showing `Round X / Y`
+- **Transcript sidebar** on the right with auto-scrolling chat log of all turns
 
-The current textures include the "Prompt to Production" branding. To customize for your event while keeping this aesthetic:
+### When the Debate Ends
 
-1. Update city and date via the `city` and `date` props in `lanyard-with-controls.tsx` (lines 189-190)
-2. The text is rendered dynamically on the canvas
-
-### Creating Your Own Textures
-
-Follow these steps if you want to create your own textures:
-1. Create your template using any design tool (Figma, Photoshop, etc)
-2. The layout has to be 1:1 aspect ratio (square)
-3. Consider safe zones for dynamic text placement (see attached figma file as an example of safe zones)
-4. Color considerations for dark/light variants (or more if you decide to extend the initial template)
-5. You need to modify the 3D texture (`card.blg`) as well so it renders the default texture on the initial load
-
-### How to edit `card.glb` (3D model) file
-
-1. Go to [this page](https://modelviewer.dev/editor/), drag and drop the `card.glb` file to preview the model
-2. Click on the palette icon tab, and under the **texture** option, load your texture image
-![Modify texture example](/public/modify-texture.png)
-3. Go back to the initial tab, and click **Download scene**
-![Export texture example](/public/export-texture.png)
-4. It'll download a zip file with all your model files. You just need to drag and drop the `card.glb` file and replace it into your `/public` folder.
-![Exported folder with texture file](/public/folder-texture.png)
-
-### Texture Specifications
-
-- **Dimensions:** 1376 x 1376 pixels (any 1:1 ratio works, the larger the better resolution will have)
-- **Format:** PNG with transparency support
-- **Files to replace:**
-  - `/public/card-base-dark.png`
-  - `/public/card-base-light.png`
-
-### Design Guidelines
-
-1. Keep the bottom ~400px area clear for the user's name
-2. Keep the top ~150px area clear for city/date text
-3. Ensure good contrast for text readability
-4. Test both dark and light variants
-
-### Template Files
-
-- [Figma template with safe zones](https://www.figma.com/design/uQPzmYgpWdI6xvK4qzaT7X/Untitled?node-id=0-1&t=ygsBkAQ4NTxKhiyh-1)
+1. The navbar status changes to "Compiling verdict..."
+2. After ~800ms, a **full-screen overlay** slides in with the verdict
+3. The verdict is at the **top of the overlay** — no scrolling needed to see it
+4. Verdict sections: Final Verdict → Executive Summary → Key Points → Unresolved Tensions
+5. Action buttons: Download Markdown, Download PDF, Share Link
+6. "Close" button returns to dashboard
 
 ---
 
@@ -282,71 +105,118 @@ Follow these steps if you want to create your own textures:
 ```
 /
 ├── app/
-│   ├── layout.tsx          # Root layout, metadata, fonts
-│   ├── page.tsx            # Home page composition
-│   ├── globals.css         # Global styles and theme tokens
-│   └── lanyard/
-│       └── page.tsx        # Shareable lanyard page
+│   ├── (auth)/                 # Clerk auth (sign-in, sign-up)
+│   ├── api/
+│   │   ├── debate/
+│   │   │   ├── start/route.ts  # Creates session, starts debate
+│   │   │   └── [id]/route.ts   # Polling endpoint for session data
+│   │   └── ...                 # Other API routes (webhooks, cron, etc.)
+│   ├── debate/
+│   │   ├── new/page.tsx        # Create new session form
+│   │   └── [id]/page.tsx       # Live meeting UI (main page)
+│   ├── share/[id]/page.tsx     # Public share page for completed debates
+│   ├── dashboard/              # User dashboard with session list
+│   ├── layout.tsx
+│   ├── page.tsx                # Landing page
+│   └── globals.css             # Global styles + keyframe animations
 ├── components/
-│   ├── hero-section.tsx    # Main hero with event info
-│   ├── features-3.tsx      # Event highlights cards
-│   ├── agenda.tsx          # Event schedule
-│   ├── call-to-action.tsx  # Registration CTA section
-│   ├── footer.tsx          # Footer with links
-│   ├── header.tsx          # Navigation header
-│   ├── lanyard-with-controls.tsx  # Lanyard + customization UI
-│   ├── card-template.tsx   # Badge texture generator
-│   ├── Dither.tsx          # Animated background effect
-│   ├── DecryptedText.tsx   # Animated text reveal
-│   ├── ui/
-│   │   └── lanyard.tsx     # 3D lanyard component (R3F)
-│   ├── icons/              # SVG icon components
-│   └── motion-primitives/  # Animation components
+│   ├── debate/
+│   │   ├── TurnBubble.tsx      # Individual turn display (share page)
+│   │   ├── ConclusionPanel.tsx # Verdict panel with export options
+│   │   └── TypewriterText.tsx  # Character-by-character typewriter effect
+│   ├── sections/               # Landing page sections
+│   ├── ui/                     # shadcn/ui components
+│   └── ...                     # Background effects, text animations
 ├── lib/
-│   └── utils.ts            # Utility functions
-├── types/                  # TypeScript definitions
-└── public/
-    ├── card-base-dark.png  # Dark lanyard texture
-    ├── card-base-light.png # Light lanyard texture
-    └── *.png               # Favicon and other assets
+│   ├── debate-engine.ts        # Core debate orchestration logic
+│   ├── ai-provider.ts          # AI provider router (Groq, Gemini, etc.)
+│   ├── dev-store.ts            # In-memory dev store (sessions, turns, conclusions)
+│   ├── grok.ts                 # Groq/xAI API client
+│   ├── gemini.ts               # Google Gemini API client
+│   ├── openrouter.ts           # OpenRouter API client
+│   ├── supabase.ts             # Supabase client (prod)
+│   └── ...
+├── types/
+│   └── index.ts                # TypeScript type definitions
+└── package.json
 ```
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Framework** | Next.js 16 (App Router) |
+| **Language** | TypeScript 5 |
+| **UI** | React 19 |
+| **Styling** | Tailwind CSS 4 |
+| **Animation** | Motion (motion/react) |
+| **Auth** | Clerk |
+| **Database (dev)** | In-memory store (`dev-store.ts`) |
+| **Database (prod)** | Supabase |
+| **AI Providers** | Groq (primary), Gemini, OpenRouter, Claude |
+| **Payments** | Stripe |
+| **Email** | Resend |
+| **Testing** | Vitest + fast-check |
+
+---
+
+## Configuration
+
+### Tier Limits (`types/index.ts`)
+
+```typescript
+export const TIER_CONFIG: Record<Tier, TierConfig> = {
+  free:    { tier: 'free',    label: 'Explorer', priceINR: 0,   quotaLimit: 9999, rounds: 4 },
+  starter: { tier: 'starter', label: 'Builder',  priceINR: 299, quotaLimit: 20,   rounds: 3 },
+  pro:     { tier: 'pro',     label: 'Pro',      priceINR: 799, quotaLimit: 60,   rounds: 5 },
+}
+```
+
+### Debate Limits
+
+```typescript
+export const DEBATE_LIMITS = {
+  MAX_TOKENS_PER_TURN:    300,
+  MAX_TURNS_PER_SESSION:  12,
+  MAX_TOPIC_LENGTH:       500,
+  MAX_CONCURRENT_DEBATES: 3,
+  MAX_RETRIES:            3,
+} as const
+```
+
+### AI Providers (`lib/ai-provider.ts`)
+
+Configure which models act as Agent A and Agent B. Default:
+- **Agent A** (FOR/Analyst): Gemini
+- **Agent B** (AGAINST/Critic): Grok
 
 ---
 
 ## Deployment
 
-### Deploy to Vercel
+### Vercel (Recommended)
 
-The easiest way to deploy is with Vercel:
-
-1. Push your customized code to GitHub
-2. Import the repository on [Vercel](https://vercel.com/new)
-3. Vercel will automatically detect Next.js and configure the build
+1. Push to GitHub
+2. Import on [Vercel](https://vercel.com/new)
+3. Add environment variables for AI providers, Supabase, Clerk, Stripe, etc.
+4. Deploy
 
 ### Environment Variables
 
-No environment variables are required for the base template.
-
----
-
-## Credits
-
-Built with:
-- [v0.app](https://v0.app) - AI-powered development
-- [Next.js](https://nextjs.org) - React framework
-- [Tailwind CSS](https://tailwindcss.com) - Styling
-- [React Three Fiber](https://r3f.docs.pmnd.rs/) - 3D rendering
-- [Rapier](https://rapier.rs/) - Physics simulation
-- [Tailark](https://tailark.com/) - UI components
-- [React Bits](https://reactbits.dev/) - Animation primitives
-- [shadcn/ui](https://ui.shadcn.com/) - UI components
+| Variable | Purpose |
+|----------|---------|
+| `GROQ_API_KEY` | Groq/xAI API key |
+| `GEMINI_API_KEY` | Google Gemini API key |
+| `OPENROUTER_API_KEY` | OpenRouter API key |
+| `CLERK_SECRET_KEY` | Clerk auth |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_ANON_KEY` | Supabase anon key |
+| `STRIPE_SECRET_KEY` | Stripe payments |
 
 ---
 
 ## License
 
-Feel free to use this template for your v0 IRL events. Attribution appreciated but not required.
-
----
-
-**Questions?** Open an issue or reach out to the v0 community.
+MIT

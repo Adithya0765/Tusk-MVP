@@ -34,7 +34,7 @@ export default function DashboardPage() {
               // TUSK_DASHBOARD
             </p>
             <h1 className="text-2xl font-bold text-white/90 font-mono tracking-tight uppercase">
-              Your Debates
+              Your Sessions
             </h1>
           </div>
           <Link
@@ -42,7 +42,7 @@ export default function DashboardPage() {
             className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-xs"
           >
             <Plus className="size-3.5" />
-            New Debate
+            New Session
           </Link>
         </div>
 

@@ -19,9 +19,9 @@ export interface TierConfig {
 }
 
 export const TIER_CONFIG: Record<Tier, TierConfig> = {
-  free:    { tier: 'free',    label: 'Explorer', priceINR: 0,   quotaLimit: 3,  rounds: 2 },
-  starter: { tier: 'starter', label: 'Builder',  priceINR: 299, quotaLimit: 20, rounds: 3 },
-  pro:     { tier: 'pro',     label: 'Pro',       priceINR: 799, quotaLimit: 60, rounds: 5 },
+  free:    { tier: 'free',    label: 'Explorer', priceINR: 0,   quotaLimit: 9999, rounds: 4 },
+  starter: { tier: 'starter', label: 'Builder',  priceINR: 299, quotaLimit: 20,   rounds: 3 },
+  pro:     { tier: 'pro',     label: 'Pro',       priceINR: 799, quotaLimit: 60,   rounds: 5 },
 }
 
 export const DEBATE_LIMITS = {
@@ -52,6 +52,7 @@ export interface DbSession {
   id: string
   user_id: string
   topic: string
+  mode: 'debate' | 'analysis'
   status: SessionStatus
   rounds: number
   error_msg: string | null

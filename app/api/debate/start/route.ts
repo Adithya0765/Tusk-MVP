@@ -35,6 +35,7 @@ export async function POST(req: Request) {
     id: sessionId,
     user_id: DEV_USER_ID,
     topic,
+    mode,
     status: 'processing',
     rounds,
     share_slug: shareSlug,

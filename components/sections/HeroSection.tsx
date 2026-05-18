@@ -183,7 +183,7 @@ function DebatePreviewCard() {
 
         <div className="p-4 space-y-2.5">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-white/40">Active Debate</span>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-white/40">Active Session</span>
             <span className="flex items-center gap-1.5">
               <span className="relative size-1.5">
                 <motion.span 
@@ -244,7 +244,7 @@ export function HeroSection() {
   const heroRef = useRef<HTMLDivElement>(null)
 
   const typed = useTypewriter(
-    ['any topic.', 'a policy debate.', 'a tech argument.', 'a moral dilemma.', 'a business case.'],
+    ['any topic.', 'a policy issue.', 'a tech argument.', 'a moral dilemma.', 'a business idea.'],
     55, 2000
   )
 
@@ -338,7 +338,7 @@ export function HeroSection() {
                 />
                 <span className="relative size-1.5 rounded-full bg-white/50 block" />
               </span>
-              AI-POWERED DEBATE ANALYSIS
+              AI-POWERED DISCUSSION & ANALYSIS
             </div>
           </motion.div>
 
@@ -366,14 +366,14 @@ export function HeroSection() {
 
           {/* Sub */}
           <motion.p variants={itemVariants} className="text-base md:text-lg max-w-xl mx-auto mb-10 leading-relaxed font-mono text-white/40">
-            Two frontier AI models argue opposing sides across multiple rounds.
+            Two frontier AI models argue opposing sides or analyze an idea across multiple rounds.
             Receive a structured conclusion with key points and a final verdict.
           </motion.p>
 
           {/* CTAs */}
           <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-14">
             <Link href="/debate/new" className="btn-primary inline-flex items-center gap-2 px-7 py-3 text-sm transition-transform hover:scale-105 active:scale-95">
-              START A DEBATE
+              START A SESSION
               <ArrowRight className="size-4" />
             </Link>
             <Link href="#how-it-works" className="btn-ghost inline-flex items-center gap-2 px-7 py-3 text-sm transition-transform hover:scale-105 active:scale-95">

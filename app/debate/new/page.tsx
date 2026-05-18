@@ -38,9 +38,9 @@ export default function NewDebatePage() {
         const d = await res.json()
         switch (d.error) {
           case 'QUOTA_EXHAUSTED': setShowUpgrade(true); break
-          case 'CONCURRENCY_LIMIT': setError(`You already have ${DEBATE_LIMITS.MAX_CONCURRENT_DEBATES} active debates.`); break
-          case 'TOPIC_EMPTY': setError('Please enter a topic.'); break
-          case 'TOPIC_TOO_LONG': setError(`Topic must be ${DEBATE_LIMITS.MAX_TOPIC_LENGTH} characters or less.`); break
+          case 'CONCURRENCY_LIMIT': setError(`You already have ${DEBATE_LIMITS.MAX_CONCURRENT_DEBATES} active sessions.`); break
+          case 'TOPIC_EMPTY': setError('Please enter a topic or idea.'); break
+          case 'TOPIC_TOO_LONG': setError(`Topic/Idea must be ${DEBATE_LIMITS.MAX_TOPIC_LENGTH} characters or less.`); break
           default: setError(d.error ?? 'Something went wrong.')
         }
         return
@@ -182,7 +182,7 @@ export default function NewDebatePage() {
                   className="px-4 py-3 text-xs font-mono"
                   style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', color: 'rgba(251,191,36,0.8)' }}
                 >
-                  You&apos;ve used all your debates this month.{' '}
+                  You&apos;ve used all your sessions this month.{' '}
                   <Link href="/sign-up" className="underline hover:opacity-80 transition-opacity">
                     Upgrade to continue →
                   </Link>

@@ -50,7 +50,7 @@ export const HeroHeader = () => {
           {/* Desktop nav */}
           <div className="hidden lg:flex items-center gap-1">
             <NavLink href="/dashboard">Dashboard</NavLink>
-            <NavLink href="/debate/new">New Debate</NavLink>
+            <NavLink href="/debate/new">New Session</NavLink>
             <NavLink href="/#how-it-works">How It Works</NavLink>
           </div>
 
@@ -60,7 +60,7 @@ export const HeroHeader = () => {
               href="/debate/new"
               className="btn-primary inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm"
             >
-              Start Debate
+              Start Session
             </Link>
           </div>
 
@@ -90,7 +90,7 @@ export const HeroHeader = () => {
               style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
             >
               <MobileNavLink href="/dashboard"     onClick={() => setMenuOpen(false)}>Dashboard</MobileNavLink>
-              <MobileNavLink href="/debate/new"    onClick={() => setMenuOpen(false)}>New Debate</MobileNavLink>
+              <MobileNavLink href="/debate/new"    onClick={() => setMenuOpen(false)}>New Session</MobileNavLink>
               <MobileNavLink href="/#how-it-works" onClick={() => setMenuOpen(false)}>How It Works</MobileNavLink>
               <div className="pt-2">
                 <Link
@@ -98,7 +98,7 @@ export const HeroHeader = () => {
                   onClick={() => setMenuOpen(false)}
                   className="btn-primary flex items-center justify-center w-full py-2.5 rounded-lg text-sm"
                 >
-                  Start Debate
+                  Start Session
                 </Link>
               </div>
             </motion.div>

@@ -172,7 +172,7 @@ Return ONLY valid JSON matching this exact schema:
   return { turns, conclusion }
 }
 
-// Full pipeline: run debate + persist to dev-store
+// Full pipeline: run debate + persist to dev-store incrementally
 export async function runDebateAndPersist(
   sessionId: string,
   _userId: string,
@@ -183,19 +183,120 @@ export async function runDebateAndPersist(
   mode: 'debate' | 'analysis' = 'debate'
 ): Promise<void> {
   try {
-    const result = await runDebate(topic, rounds, mode)
+    const { agentA, agentB } = getAgentNames()
+    const turns: Turn[] = []
+    let totalTurns = 0
 
-    // Persist turns
-    insertTurns(result.turns.map(t => ({
-      session_id: sessionId,
-      round_num: t.roundNum,
-      agent: t.agent,
-      content: t.content,
-      token_count: null,
-    })))
+    const promptA = mode === 'analysis' 
+      ? `You are an insightful analyst exploring an idea.
+Your role: Highlight the strengths, potential, and constructive additions to the idea.
+Rules:
+- Be specific and use logical reasoning
+- Keep response to 150-200 words
+- Work with the other agent to build a comprehensive view
+Idea: ${topic}` 
+      : FOR_SYSTEM_PROMPT(topic);
+
+    const promptB = mode === 'analysis'
+      ? `You are a critical thinker evaluating an idea.
+Your role: Identify flaws, edge cases, missing pieces, and challenges in the idea.
+Rules:
+- Be specific and provide constructive criticism
+- Keep response to 150-200 words
+- Reference the insights of the other agent if this is not round 1
+Idea: ${topic}`
+      : AGAINST_SYSTEM_PROMPT(topic);
+
+    for (let round = 1; round <= rounds; round++) {
+      if (totalTurns >= DEBATE_LIMITS.MAX_TURNS_PER_SESSION) break
+
+      const transcriptSoFar = turns
+        .map(t => `[${t.agentName} — ${t.role}]: ${t.content}`)
+        .join('\n\n')
+
+      const topicLabel = mode === 'analysis' ? 'Idea' : 'Topic'
+      const roleA = mode === 'analysis' ? 'Strengths' : 'For'
+      const roleB = mode === 'analysis' ? 'Challenges' : 'Against'
+      
+      const forMessage =
+        round === 1
+          ? `${topicLabel}: ${topic}`
+          : `${topicLabel}: ${topic}\n\nDiscussion so far:\n${transcriptSoFar}\n\nNow give your round ${round} point regarding ${roleA}.`
+
+      const contentA = await callWithRetry(() =>
+        callAgentA(promptA, forMessage)
+      )
+      const turnA: Turn = { roundNum: round, agent: 'A', agentName: agentA, role: roleA as 'For' | 'Against', content: contentA }
+      turns.push(turnA)
+      totalTurns++
+
+      // Persist turn immediately so UI can show it
+      insertTurns([{
+        session_id: sessionId,
+        round_num: round,
+        agent: 'A',
+        content: contentA,
+        token_count: null,
+      }])
+
+      if (totalTurns >= DEBATE_LIMITS.MAX_TURNS_PER_SESSION) break
+
+      const transcriptWithA = turns
+        .map(t => `[${t.agentName} — ${t.role}]: ${t.content}`)
+        .join('\n\n')
+
+      const againstMessage = `${topicLabel}: ${topic}\n\nDiscussion so far:\n${transcriptWithA}\n\nNow give your round ${round} point regarding ${roleB}.`
+
+      const contentB = await callWithRetry(() =>
+        callAgentB(promptB, againstMessage)
+      )
+      const turnB: Turn = { roundNum: round, agent: 'B', agentName: agentB, role: roleB as 'For' | 'Against', content: contentB }
+      turns.push(turnB)
+      totalTurns++
+
+      // Persist turn immediately so UI can show it
+      insertTurns([{
+        session_id: sessionId,
+        round_num: round,
+        agent: 'B',
+        content: contentB,
+        token_count: null,
+      }])
+    }
+
+    const fullTranscript = turns
+      .map(t => `[${t.agentName} — ${t.role}, Round ${t.roundNum}]: ${t.content}`)
+      .join('\n\n')
+
+    const conclusionSystemPrompt = mode === 'analysis'
+      ? `You are an impartial analyst reviewing a discussion about an idea.
+Generate a structured conclusion. Be honest. Do not give a diplomatic non-answer.
+Return ONLY valid JSON matching this exact schema:
+{
+  "executiveSummary": "string (2-3 sentences)",
+  "keyPointsFor": ["string", "string", "string"],
+  "keyPointsAgainst": ["string", "string", "string"],
+  "unresolvedTensions": ["string"],
+  "finalVerdict": "string (overall viability of the idea and recommended next steps)",
+  "confidenceLevel": "Low" | "Medium" | "High"
+}` 
+      : CONCLUSION_SYSTEM_PROMPT;
+
+    const conclusionRaw = await callWithRetry(() =>
+      callConclusion(
+        conclusionSystemPrompt,
+        `Topic/Idea: ${topic}\n\nFull transcript:\n${fullTranscript}`
+      )
+    )
+
+    const jsonStr = conclusionRaw
+      .replace(/^```json\s*/i, '')
+      .replace(/```\s*$/, '')
+      .trim()
+    const conclusion = JSON.parse(jsonStr)
 
     // Persist conclusion
-    insertConclusion(sessionId, JSON.stringify(result.conclusion))
+    insertConclusion(sessionId, JSON.stringify(conclusion))
 
     // Mark complete
     updateSession(sessionId, { status: 'complete' })

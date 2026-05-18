@@ -9,6 +9,7 @@ export interface DevSession {
   id: string
   user_id: string
   topic: string
+  mode: 'debate' | 'analysis'
   status: 'processing' | 'complete' | 'failed'
   rounds: number
   share_slug: string

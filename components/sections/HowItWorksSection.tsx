@@ -11,7 +11,7 @@ const STEPS = [
   },
   {
     num: '02', icon: Zap,
-    title: 'Models debate',
+    title: 'Models discuss',
     desc: 'The two models exchange arguments across multiple rounds. Each turn is focused and concise — no filler, just structured reasoning that builds round by round.',
   },
   {

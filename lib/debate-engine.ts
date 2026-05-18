@@ -1,6 +1,6 @@
 import { callAgentA, callAgentB, callConclusion, getAgentNames } from './ai-provider'
 import { updateSession, insertTurns, insertConclusion } from './dev-store'
-import { DEBATE_LIMITS } from '../types'
+import { DEBATE_LIMITS, type ConclusionData } from '../types'
 
 const FOR_SYSTEM_PROMPT = (topic: string) => `You are a skilled debater arguing FOR the following topic.
 Your role: Present the strongest possible case in support.
@@ -36,78 +36,6 @@ Return ONLY this exact JSON structure:
 }
 
 Do NOT include any text outside the JSON object. Start with { and end with }.`
-
-export interface Turn {
-  roundNum: number
-  agent: 'A' | 'B'
-  agentName: string
-  role: 'For' | 'Against' | 'Builder' | 'StressTester'
-  content: string
-}
-
-export interface DebateResult {
-  turns: Turn[]
-  conclusion: {
-    executiveSummary: string
-    keyPointsFor: string[]
-    keyPointsAgainst: string[]
-    unresolvedTensions: string[]
-    finalVerdict: string
-    confidenceLevel: string
-  }
-}
-
-function parseConclusionJSON(raw: string): DebateResult['conclusion'] {
-  let cleaned = raw
-    .replace(/^```json\s*/i, '')
-    .replace(/```\s*$/, '')
-    .trim()
-
-  try {
-    return JSON.parse(cleaned)
-  } catch {
-    const start = cleaned.indexOf('{')
-    const end = cleaned.lastIndexOf('}')
-    if (start !== -1 && end !== -1 && end > start) {
-      try {
-        return JSON.parse(cleaned.slice(start, end + 1))
-      } catch {
-        // fall through
-      }
-    }
-  }
-
-  console.error('[debate] Failed to parse conclusion JSON. Raw:', raw.slice(0, 200))
-  return {
-    executiveSummary: 'The session completed but the verdict could not be formatted.',
-    keyPointsFor: ['See transcript for details'],
-    keyPointsAgainst: ['See transcript for details'],
-    unresolvedTensions: ['Conclusion parsing failed'],
-    finalVerdict: 'Review the transcript above for the full discussion.',
-    confidenceLevel: 'Low',
-    recommendedActions: ['Review the discussion transcript for actionable insights'],
-    improvementSuggestions: ['Review the discussion transcript for improvement ideas'],
-  }
-}
-
-async function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-async function callWithRetry<T>(
-  fn: () => Promise<T>,
-  retries = DEBATE_LIMITS.MAX_RETRIES
-): Promise<T> {
-  for (let attempt = 0; attempt < retries; attempt++) {
-    try {
-      return await fn()
-    } catch (err) {
-      if (attempt === retries - 1) throw err
-      await sleep(1000 * 2 ** attempt)
-    }
-  }
-  throw new Error('unreachable')
-}
 
 const ANALYSIS_AGENT_A = (idea: string) => `You are a strategic product builder. Your job is to take a raw idea and actively develop it into something concrete and viable.
 
@@ -152,7 +80,9 @@ Return ONLY this exact JSON structure:
 
 Do NOT include any text outside the JSON object. Start with { and end with }.`
 
-const PRD_SYSTEM_PROMPT = `You are a senior product manager writing a Product Requirements Document (PRD) based on a refined idea.
+// PRD prompt — takes only the refined idea summary, not the full transcript.
+// Keeps the input small so Cerebras never hits token limits.
+const PRD_SYSTEM_PROMPT = `You are a senior product manager writing a concise Product Requirements Document (PRD).
 Be specific, realistic, and actionable. No fluff.
 
 CRITICAL: Your entire response must be ONLY valid JSON. No text before or after. No markdown. No explanation.
@@ -169,79 +99,85 @@ Return ONLY this exact JSON structure:
 
 Do NOT include any text outside the JSON object. Start with { and end with }.`
 
-// Pure debate logic — returns result without touching DB
-export async function runDebate(
-  topic: string,
-  rounds: number,
-  mode: 'debate' | 'analysis' = 'debate'
-): Promise<DebateResult> {
-  const { agentA, agentB } = getAgentNames()
-  const turns: Turn[] = []
-  let totalTurns = 0
+export interface Turn {
+  roundNum: number
+  agent: 'A' | 'B'
+  agentName: string
+  role: 'For' | 'Against' | 'Builder' | 'StressTester'
+  content: string
+}
 
-  const promptA = mode === 'analysis'
-    ? ANALYSIS_AGENT_A(topic)
-    : FOR_SYSTEM_PROMPT(topic)
+export interface DebateResult {
+  turns: Turn[]
+  conclusion: ConclusionData
+}
 
-  const promptB = mode === 'analysis'
-    ? ANALYSIS_AGENT_B(topic)
-    : AGAINST_SYSTEM_PROMPT(topic)
+function parseConclusionJSON(raw: string): ConclusionData {
+  const cleaned = raw
+    .replace(/^```json\s*/i, '')
+    .replace(/```\s*$/, '')
+    .trim()
 
-  for (let round = 1; round <= rounds; round++) {
-    if (totalTurns >= DEBATE_LIMITS.MAX_TURNS_PER_SESSION) break
-
-    const transcriptSoFar = turns
-      .map(t => `[${t.agentName} — ${t.role}]: ${t.content}`)
-      .join('\n\n')
-
-    const topicLabel = mode === 'analysis' ? 'Idea' : 'Topic'
-    const roleA = mode === 'analysis' ? 'Builder' : 'For'
-    const roleB = mode === 'analysis' ? 'Stress Tester' : 'Against'
-    
-    const forMessage =
-      round === 1
-        ? `${topicLabel}: ${topic}`
-        : `${topicLabel}: ${topic}\n\nDiscussion so far:\n${transcriptSoFar}\n\nNow give your round ${round} input as ${roleA}.`
-
-    const contentA = await callWithRetry(() =>
-      callAgentA(promptA, forMessage)
-    )
-    turns.push({ roundNum: round, agent: 'A', agentName: agentA, role: roleA as Turn['role'], content: contentA })
-    totalTurns++
-
-    if (totalTurns >= DEBATE_LIMITS.MAX_TURNS_PER_SESSION) break
-
-    const transcriptWithA = turns
-      .map(t => `[${t.agentName} — ${t.role}]: ${t.content}`)
-      .join('\n\n')
-
-    const againstMessage = `${topicLabel}: ${topic}\n\nDiscussion so far:\n${transcriptWithA}\n\nNow give your round ${round} input as ${roleB}.`
-
-    const contentB = await callWithRetry(() =>
-      callAgentB(promptB, againstMessage)
-    )
-    turns.push({ roundNum: round, agent: 'B', agentName: agentB, role: roleB as Turn['role'], content: contentB })
-    totalTurns++
+  try {
+    return JSON.parse(cleaned) as ConclusionData
+  } catch {
+    const start = cleaned.indexOf('{')
+    const end = cleaned.lastIndexOf('}')
+    if (start !== -1 && end !== -1 && end > start) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1)) as ConclusionData
+      } catch {
+        // fall through
+      }
+    }
   }
 
-  const fullTranscript = turns
-    .map(t => `[${t.agentName} — ${t.role}, Round ${t.roundNum}]: ${t.content}`)
-    .join('\n\n')
+  console.error('[debate] Failed to parse conclusion JSON. Raw:', raw.slice(0, 300))
+  return {
+    executiveSummary: 'The session completed but the verdict could not be formatted.',
+    keyPointsFor: ['See transcript for details'],
+    keyPointsAgainst: ['See transcript for details'],
+    unresolvedTensions: ['Conclusion parsing failed'],
+    finalVerdict: 'Review the transcript above for the full discussion.',
+    confidenceLevel: 'Low',
+    recommendedActions: ['Review the discussion transcript for actionable insights'],
+    improvementSuggestions: ['Review the discussion transcript for improvement ideas'],
+  }
+}
 
-  const conclusionSystemPrompt = mode === 'analysis'
-    ? ANALYSIS_CONCLUSION
-    : CONCLUSION_SYSTEM_PROMPT
+function parsePRDJSON(raw: string): ConclusionData['prd'] | null {
+  const cleaned = raw
+    .replace(/^```json\s*/i, '')
+    .replace(/```\s*$/, '')
+    .trim()
+  const start = cleaned.indexOf('{')
+  const end = cleaned.lastIndexOf('}')
+  if (start === -1 || end === -1 || end <= start) return null
+  try {
+    return JSON.parse(cleaned.slice(start, end + 1))
+  } catch {
+    console.error('[debate] PRD JSON parse failed. Raw:', raw.slice(0, 300))
+    return null
+  }
+}
 
-  const conclusionRaw = await callWithRetry(() =>
-    callConclusion(
-      conclusionSystemPrompt,
-      `Topic/Idea: ${topic}\n\nFull transcript:\n${fullTranscript}`
-    )
-  )
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
 
-  const conclusion = parseConclusionJSON(conclusionRaw)
-
-  return { turns, conclusion }
+async function callWithRetry<T>(
+  fn: () => Promise<T>,
+  retries = DEBATE_LIMITS.MAX_RETRIES
+): Promise<T> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (attempt === retries - 1) throw err
+      await sleep(1000 * 2 ** attempt)
+    }
+  }
+  throw new Error('unreachable')
 }
 
 // Full pipeline: run debate + persist to dev-store incrementally
@@ -260,13 +196,11 @@ export async function runDebateAndPersist(
     const turns: Turn[] = []
     let totalTurns = 0
 
-    const promptA = mode === 'analysis'
-      ? ANALYSIS_AGENT_A(topic)
-      : FOR_SYSTEM_PROMPT(topic)
-
-    const promptB = mode === 'analysis'
-      ? ANALYSIS_AGENT_B(topic)
-      : AGAINST_SYSTEM_PROMPT(topic)
+    const promptA = mode === 'analysis' ? ANALYSIS_AGENT_A(topic) : FOR_SYSTEM_PROMPT(topic)
+    const promptB = mode === 'analysis' ? ANALYSIS_AGENT_B(topic) : AGAINST_SYSTEM_PROMPT(topic)
+    const topicLabel = mode === 'analysis' ? 'Idea' : 'Topic'
+    const roleA = mode === 'analysis' ? 'Builder' : 'For'
+    const roleB = mode === 'analysis' ? 'Stress Tester' : 'Against'
 
     for (let round = 1; round <= rounds; round++) {
       if (totalTurns >= DEBATE_LIMITS.MAX_TURNS_PER_SESSION) break
@@ -276,55 +210,29 @@ export async function runDebateAndPersist(
         .map(t => `[${t.agentName} — ${t.role}]: ${t.content}`)
         .join('\n\n')
 
-      const topicLabel = mode === 'analysis' ? 'Idea' : 'Topic'
-      const roleA = mode === 'analysis' ? 'Builder' : 'For'
-      const roleB = mode === 'analysis' ? 'Stress Tester' : 'Against'
-      
-      const forMessage =
-        round === 1
-          ? `${topicLabel}: ${topic}`
-          : `${topicLabel}: ${topic}\n\nDiscussion so far:\n${transcriptSoFar}\n\nNow give your round ${round} input as ${roleA}.`
+      const forMessage = round === 1
+        ? `${topicLabel}: ${topic}`
+        : `${topicLabel}: ${topic}\n\nDiscussion so far:\n${transcriptSoFar}\n\nNow give your round ${round} input as ${roleA}.`
 
-      const contentA = await callWithRetry(() =>
-        callAgentA(promptA, forMessage)
-      )
+      const contentA = await callWithRetry(() => callAgentA(promptA, forMessage))
       console.log(`[debate] Round ${round} Agent A done (${contentA.length} chars)`)
-      const turnA: Turn = { roundNum: round, agent: 'A', agentName: agentA, role: roleA as Turn['role'], content: contentA }
-      turns.push(turnA)
+      turns.push({ roundNum: round, agent: 'A', agentName: agentA, role: roleA as Turn['role'], content: contentA })
       totalTurns++
-
-      insertTurns([{
-        session_id: sessionId,
-        round_num: round,
-        agent: 'A',
-        content: contentA,
-        token_count: null,
-      }])
+      insertTurns([{ session_id: sessionId, round_num: round, agent: 'A', content: contentA, token_count: null }])
 
       if (totalTurns >= DEBATE_LIMITS.MAX_TURNS_PER_SESSION) break
 
       const transcriptWithA = turns
         .map(t => `[${t.agentName} — ${t.role}]: ${t.content}`)
         .join('\n\n')
-
       const againstMessage = `${topicLabel}: ${topic}\n\nDiscussion so far:\n${transcriptWithA}\n\nNow give your round ${round} input as ${roleB}.`
 
       console.log(`[debate] Round ${round} — calling Agent B...`)
-      const contentB = await callWithRetry(() =>
-        callAgentB(promptB, againstMessage)
-      )
+      const contentB = await callWithRetry(() => callAgentB(promptB, againstMessage))
       console.log(`[debate] Round ${round} Agent B done (${contentB.length} chars)`)
-      const turnB: Turn = { roundNum: round, agent: 'B', agentName: agentB, role: roleB as Turn['role'], content: contentB }
-      turns.push(turnB)
+      turns.push({ roundNum: round, agent: 'B', agentName: agentB, role: roleB as Turn['role'], content: contentB })
       totalTurns++
-
-      insertTurns([{
-        session_id: sessionId,
-        round_num: round,
-        agent: 'B',
-        content: contentB,
-        token_count: null,
-      }])
+      insertTurns([{ session_id: sessionId, round_num: round, agent: 'B', content: contentB, token_count: null }])
     }
 
     console.log(`[debate] All rounds done, generating conclusion...`)
@@ -332,46 +240,27 @@ export async function runDebateAndPersist(
       .map(t => `[${t.agentName} — ${t.role}, Round ${t.roundNum}]: ${t.content}`)
       .join('\n\n')
 
-    const conclusionSystemPrompt = mode === 'analysis'
-      ? ANALYSIS_CONCLUSION
-      : CONCLUSION_SYSTEM_PROMPT
-
+    const conclusionSystemPrompt = mode === 'analysis' ? ANALYSIS_CONCLUSION : CONCLUSION_SYSTEM_PROMPT
     const conclusionRaw = await callWithRetry(() =>
-      callConclusion(
-        conclusionSystemPrompt,
-        `Topic/Idea: ${topic}\n\nFull transcript:\n${fullTranscript}`
-      )
+      callConclusion(conclusionSystemPrompt, `${topicLabel}: ${topic}\n\nFull transcript:\n${fullTranscript}`)
     )
-
     const conclusion = parseConclusionJSON(conclusionRaw)
 
-    // For analysis mode, make a separate PRD call so neither prompt is overloaded
+    // PRD: only for analysis mode. Input is just the refined idea + the verdict/summary —
+    // intentionally small so Cerebras never hits token limits.
     if (mode === 'analysis') {
-      console.log(`[debate] Generating PRD...`)
+      console.log(`[debate] Generating PRD from verdict...`)
       try {
-        const prdRaw = await callWithRetry(() =>
-          callConclusion(
-            PRD_SYSTEM_PROMPT,
-            `Idea: ${topic}\n\nRefined discussion transcript:\n${fullTranscript}`
-          )
-        )
-        const prdCleaned = prdRaw
-          .replace(/^```json\s*/i, '')
-          .replace(/```\s*$/, '')
-          .trim()
-        let prdStart = prdCleaned.indexOf('{')
-        let prdEnd = prdCleaned.lastIndexOf('}')
-        if (prdStart !== -1 && prdEnd !== -1 && prdEnd > prdStart) {
-          try {
-            conclusion.prd = JSON.parse(prdCleaned.slice(prdStart, prdEnd + 1))
-            console.log(`[debate] PRD generated successfully`)
-          } catch {
-            console.error('[debate] PRD JSON parse failed, skipping')
-          }
+        const prdInput = `Idea: ${topic}\n\nRefined idea summary: ${conclusion.executiveSummary}\n\nFinal assessment: ${conclusion.finalVerdict}`
+        const prdRaw = await callWithRetry(() => callConclusion(PRD_SYSTEM_PROMPT, prdInput))
+        console.log(`[debate] PRD raw (first 200 chars):`, prdRaw.slice(0, 200))
+        const prd = parsePRDJSON(prdRaw)
+        if (prd) {
+          conclusion.prd = prd
+          console.log(`[debate] PRD attached, keys:`, Object.keys(prd))
         }
       } catch (prdErr: any) {
-        console.error('[debate] PRD generation failed:', prdErr?.message)
-        // Non-fatal — conclusion still saves without PRD
+        console.error('[debate] PRD generation failed (non-fatal):', prdErr?.message)
       }
     }
 

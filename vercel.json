@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "app/api/debate/start/route.ts": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/reset-quotas",

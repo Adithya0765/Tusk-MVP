@@ -73,6 +73,7 @@ export default function DebatePage() {
   const prevTurnCountRef = useRef(0)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const verdictAnnouncedRef = useRef(false)
+  const notFoundAttemptsRef = useRef(0)
 
   function stopPolling() {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
@@ -80,7 +81,18 @@ export default function DebatePage() {
 
   async function fetchFullData() {
     const res = await fetch(`/api/debate/${id}`)
-    if (res.status === 404) { setNotFound(true); setLoading(false); return }
+    if (res.status === 404) {
+      notFoundAttemptsRef.current += 1
+      if (notFoundAttemptsRef.current >= 5) {
+        setNotFound(true)
+        setLoading(false)
+        stopPolling()
+      }
+      return
+    }
+    
+    notFoundAttemptsRef.current = 0
+    
     if (!res.ok) { setLoading(false); return }
     const newData = await res.json()
     
@@ -144,12 +156,12 @@ export default function DebatePage() {
           <AlertTriangle className="size-8 text-white/50" />
         </div>
         <div>
-          <h2 className="text-lg font-bold text-white/90 mb-2 font-mono uppercase">Debate not found</h2>
-          <p className="text-sm font-mono text-white/35">This debate doesn&apos;t exist or you don&apos;t have access.</p>
+          <h2 className="text-lg font-bold text-white/90 mb-2 font-mono uppercase">Session not found</h2>
+          <p className="text-sm font-mono text-white/35">This session doesn&apos;t exist or may have been cleared.</p>
         </div>
         <Link href="/debate/new" className="inline-flex items-center gap-2 text-sm font-mono text-white/40 hover:text-white/80 transition-colors group">
           <ChevronLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" />
-          Start a new debate
+          Start a new session
         </Link>
       </motion.div>
     </div>
@@ -185,8 +197,8 @@ export default function DebatePage() {
     : null
 
   const agentConfig = [
-    { id: 'A', name: agentNames.agentA, label: session.mode === 'analysis' ? 'Analyst' : 'Pro' },
-    { id: 'B', name: agentNames.agentB, label: session.mode === 'analysis' ? 'Critic' : 'Con' }
+    { id: 'A', name: agentNames.agentA, label: session.mode === 'analysis' ? 'Builder' : 'Pro' },
+    { id: 'B', name: agentNames.agentB, label: session.mode === 'analysis' ? 'Stress Tester' : 'Con' }
   ]
 
   return (
@@ -384,6 +396,7 @@ export default function DebatePage() {
                 <ConclusionPanel
                   conclusion={dbConclusion} turns={turns} topic={session.topic}
                   shareSlug={session.share_slug ?? session.id}
+                  mode={session.mode}
                 />
               </div>
             </motion.div>

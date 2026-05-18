@@ -12,7 +12,9 @@ interface PageProps { params: Promise<{ id: string }> }
 async function getSession(slug: string): Promise<DbSession | null> {
   const supabase = createServerClient()
   const { data } = await supabase.from('sessions').select('*').eq('share_slug', slug).single()
-  return data ?? null
+  return data
+    ? { ...data, mode: data.mode || 'debate' }
+    : null
 }
 async function getTurns(sessionId: string): Promise<DbTurn[]> {
   const supabase = createServerClient()
@@ -139,6 +141,7 @@ export default async function SharePage({ params }: PageProps) {
               <ConclusionPanel
                 conclusion={dbConclusion} turns={turns} topic={session.topic}
                 shareSlug={session.share_slug ?? session.id} hideActions={true}
+                mode={session.mode}
               />
             </div>
           </div>

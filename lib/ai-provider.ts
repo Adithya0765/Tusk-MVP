@@ -1,19 +1,21 @@
 /**
  * AI Provider router
  *
- * Active:   grok  (Groq — llama-3.3-70b FOR, llama-3.1-8b AGAINST)
- * Standby:  gemini     (set ACTIVE_PROVIDER=gemini)
+ * Active:   cerebras (default — llama3.3-70b, extremely fast)
  * Standby:  openrouter (set ACTIVE_PROVIDER=openrouter)
+ * Standby:  gemini     (set ACTIVE_PROVIDER=gemini)
+ * Standby:  grok       (set ACTIVE_PROVIDER=grok)
  * Standby:  claude     (set ACTIVE_PROVIDER=claude + CLAUDE_ENABLED=true)
  *
- * UI labels stay as "Gemini" / "Grok" regardless of active provider.
+ * UI labels: "Agent A" / "Agent B" — provider-agnostic.
  */
 
-import { callGrok, callGrokB, callGrokConclusion } from './grok'
-import { callGemini } from './gemini'
+import { callCerebrasA, callCerebrasB, callCerebrasConclusion } from './cerebras'
 import { callOpenRouterA, callOpenRouterB, callOpenRouterConclusion } from './openrouter'
+import { callGemini } from './gemini'
+import { callGrok, callGrokB, callGrokConclusion } from './grok'
 
-const PROVIDER = (process.env.ACTIVE_PROVIDER ?? 'grok').toLowerCase()
+const PROVIDER = (process.env.ACTIVE_PROVIDER ?? 'cerebras').toLowerCase()
 
 const claudeEnabled =
   PROVIDER === 'claude' &&
@@ -32,37 +34,40 @@ async function callClaude(systemPrompt: string, userMessage: string): Promise<st
   return (msg.content[0] as { text: string }).text
 }
 
-// ── Agent A — FOR side ────────────────────────────────────────────────────────
+// ── Agent A ─────────────────────────────────────────────────────────────────
 export async function callAgentA(systemPrompt: string, userMessage: string): Promise<string> {
-  if (PROVIDER === 'gemini')     return callGemini(systemPrompt, userMessage)
   if (PROVIDER === 'openrouter') return callOpenRouterA(systemPrompt, userMessage)
+  if (PROVIDER === 'gemini')     return callGemini(systemPrompt, userMessage)
+  if (PROVIDER === 'grok')       return callGrok(systemPrompt, userMessage)
   if (claudeEnabled)             return callClaude(systemPrompt, userMessage)
-  // default: grok (llama-3.3-70b)
-  return callGrok(systemPrompt, userMessage)
+  // default: cerebras
+  return callCerebrasA(systemPrompt, userMessage)
 }
 
-// ── Agent B — AGAINST side ────────────────────────────────────────────────────
+// ── Agent B ─────────────────────────────────────────────────────────────────
 export async function callAgentB(systemPrompt: string, userMessage: string): Promise<string> {
-  if (PROVIDER === 'gemini')     return callGemini(systemPrompt, userMessage)
   if (PROVIDER === 'openrouter') return callOpenRouterB(systemPrompt, userMessage)
-  if (claudeEnabled)             return callClaude(systemPrompt, userMessage)
-  // default: grok (llama-3.1-8b — faster, different voice)
-  return callGrokB(systemPrompt, userMessage)
-}
-
-// ── Conclusion synthesizer ────────────────────────────────────────────────────
-export async function callConclusion(systemPrompt: string, userMessage: string): Promise<string> {
   if (PROVIDER === 'gemini')     return callGemini(systemPrompt, userMessage)
-  if (PROVIDER === 'openrouter') return callOpenRouterConclusion(systemPrompt, userMessage)
+  if (PROVIDER === 'grok')       return callGrokB(systemPrompt, userMessage)
   if (claudeEnabled)             return callClaude(systemPrompt, userMessage)
-  // default: grok (llama-3.3-70b for structured JSON output)
-  return callGrokConclusion(systemPrompt, userMessage)
+  // default: cerebras
+  return callCerebrasB(systemPrompt, userMessage)
 }
 
-// ── UI labels — always show Gemini / Grok regardless of active provider ───────
+// ── Conclusion ──────────────────────────────────────────────────────────────
+export async function callConclusion(systemPrompt: string, userMessage: string): Promise<string> {
+  if (PROVIDER === 'openrouter') return callOpenRouterConclusion(systemPrompt, userMessage)
+  if (PROVIDER === 'gemini')     return callGemini(systemPrompt, userMessage)
+  if (PROVIDER === 'grok')       return callGrokConclusion(systemPrompt, userMessage)
+  if (claudeEnabled)             return callClaude(systemPrompt, userMessage)
+  // default: cerebras
+  return callCerebrasConclusion(systemPrompt, userMessage)
+}
+
+// ── UI labels ───────────────────────────────────────────────────────────────
 export function getAgentNames() {
-  return {
-    agentA: 'Gemini',
-    agentB: 'Grok',
+  if (PROVIDER === 'cerebras') {
+    return { agentA: 'Qwen 3', agentB: 'Llama 3.1' }
   }
+  return { agentA: 'Agent A', agentB: 'Agent B' }
 }

@@ -7,7 +7,7 @@ import { motion } from 'motion/react'
 import type { ConclusionData, DbConclusion, DbTurn } from '@/types'
 
 interface ConclusionPanelProps {
-  conclusion: DbConclusion; turns: DbTurn[]; topic: string; shareSlug: string; hideActions?: boolean
+  conclusion: DbConclusion; turns: DbTurn[]; topic: string; shareSlug: string; hideActions?: boolean; mode?: 'debate' | 'analysis'
 }
 
 const CONF: Record<string, { color: string; bg: string; border: string }> = {
@@ -16,15 +16,28 @@ const CONF: Record<string, { color: string; bg: string; border: string }> = {
   High:   { color: 'rgba(74,222,128,0.8)',  bg: 'rgba(34,197,94,0.06)',  border: 'rgba(34,197,94,0.18)'  },
 }
 
-function buildMarkdown(topic: string, turns: DbTurn[], data: ConclusionData): string {
+function buildMarkdown(topic: string, turns: DbTurn[], data: ConclusionData, mode: string): string {
   const L: string[] = []
   L.push(`# TUSK Session: ${topic}`, '', '## Transcript', '')
-  for (const t of turns) L.push(`### Round ${t.round_num} — ${t.agent === 'A' ? 'FOR / ANALYSIS' : 'AGAINST / CRITIQUE'}`, '', t.content, '')
+  for (const t of turns) {
+    const label = t.agent === 'A'
+      ? (mode === 'analysis' ? 'Builder' : 'FOR')
+      : (mode === 'analysis' ? 'Stress Tester' : 'AGAINST')
+    L.push(`### Round ${t.round_num} — ${label}`, '', t.content, '')
+  }
   L.push('---', '', '## Conclusion', '', '### Executive Summary', '', data.executiveSummary, '')
-  L.push('### Key Points FOR', ''); for (const p of data.keyPointsFor) L.push(`- ${p}`)
-  L.push('', '### Key Points AGAINST', ''); for (const p of data.keyPointsAgainst) L.push(`- ${p}`)
+  const forLabel = mode === 'analysis' ? 'What Works Well' : 'Key Points For'
+  const againstLabel = mode === 'analysis' ? 'Remaining Risks' : 'Key Points Against'
+  L.push(`### ${forLabel}`, ''); for (const p of data.keyPointsFor) L.push(`- ${p}`)
+  L.push('', `### ${againstLabel}`, ''); for (const p of data.keyPointsAgainst) L.push(`- ${p}`)
   L.push('', '### Unresolved Tensions', ''); for (const p of data.unresolvedTensions) L.push(`- ${p}`)
   L.push('', '### Final Verdict', '', data.finalVerdict, '', `### Confidence: ${data.confidenceLevel}`)
+  if (mode === 'analysis' && data.recommendedActions?.length) {
+    L.push('', '### Recommended Next Steps', ''); for (const a of data.recommendedActions) L.push(`- ${a}`)
+  }
+  if (mode === 'analysis' && data.improvementSuggestions?.length) {
+    L.push('', '### How to Improve Further', ''); for (const s of data.improvementSuggestions) L.push(`- ${s}`)
+  }
   return L.join('\n')
 }
 
@@ -49,7 +62,7 @@ function ActionBtn({ onClick, disabled, icon: Icon, label }: {
   )
 }
 
-export function ConclusionPanel({ conclusion, turns, topic, shareSlug, hideActions = false }: ConclusionPanelProps) {
+export function ConclusionPanel({ conclusion, turns, topic, shareSlug, hideActions = false, mode = 'debate' }: ConclusionPanelProps) {
   const [copying, setCopying] = useState(false)
 
   let data: ConclusionData
@@ -66,7 +79,7 @@ export function ConclusionPanel({ conclusion, turns, topic, shareSlug, hideActio
   }
 
   function handleDownloadMarkdown() {
-    const blob = new Blob([buildMarkdown(topic, turns, data)], { type: 'text/markdown' })
+    const blob = new Blob([buildMarkdown(topic, turns, data, mode)], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = `tusk-session-${shareSlug}.md`; a.click()
     URL.revokeObjectURL(url)
@@ -75,27 +88,133 @@ export function ConclusionPanel({ conclusion, turns, topic, shareSlug, hideActio
   async function handleDownloadPDF() {
     const { jsPDF } = await import('jspdf')
     const doc = new jsPDF({ unit: 'pt', format: 'a4' })
-    const W = doc.internal.pageSize.getWidth(), margin = 48, maxW = W - margin * 2; let y = margin
-    function add(text: string, size: number, bold = false, color: [number,number,number] = [200,200,200]) {
-      doc.setFontSize(size); doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setTextColor(...color)
-      for (const line of doc.splitTextToSize(text, maxW) as string[]) {
-        if (y > doc.internal.pageSize.getHeight() - margin) { doc.addPage(); y = margin }
-        doc.text(line, margin, y); y += size * 1.4
-      }; y += 4
+    const W = doc.internal.pageSize.getWidth()
+    const H = doc.internal.pageSize.getHeight()
+    const margin = 50
+    const maxW = W - margin * 2
+    let y = margin
+
+    function addPageIfNeeded(spaceNeeded: number) {
+      if (y + spaceNeeded > H - margin) {
+        doc.addPage()
+        y = margin
+      }
     }
-    add(`TUSK Session: ${topic}`, 18, true, [240,240,240]); y += 8
-    add('Transcript', 13, true, [180,180,180])
+
+    function add(text: string, size: number, bold: boolean, color: [number, number, number], spacing?: number) {
+      addPageIfNeeded(size * 2)
+      doc.setFontSize(size)
+      doc.setFont('helvetica', bold ? 'bold' : 'normal')
+      doc.setTextColor(color[0], color[1], color[2])
+      const lines = doc.splitTextToSize(text, maxW) as string[]
+      for (const line of lines) {
+        addPageIfNeeded(size * 1.5)
+        doc.text(line, margin, y)
+        y += size * 1.5
+      }
+      if (spacing) y += spacing
+    }
+
+    function addBullet(text: string, size: number, color: [number, number, number]) {
+      addPageIfNeeded(size * 1.5)
+      doc.setFontSize(size)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(color[0], color[1], color[2])
+      doc.text('\u2022  ' + text, margin + 8, y)
+      y += size * 1.6
+    }
+
+    // Title
+    add(`TUSK: ${topic}`, 20, true, [30, 30, 30], 12)
+
+    // Separator line
+    doc.setDrawColor(200, 200, 200)
+    doc.setLineWidth(0.5)
+    doc.line(margin, y, W - margin, y)
+    y += 16
+
+    // Transcript section
+    add('Transcript', 14, true, [50, 50, 50], 8)
+
     for (const t of turns) {
-      add(`Round ${t.round_num} — ${t.agent === 'A' ? 'FOR / ANALYSIS' : 'AGAINST / CRITIQUE'}`, 10, true, [160,160,160])
-      add(t.content, 10, false, [200,200,200]); y += 4
+      const label = t.agent === 'A'
+        ? (mode === 'analysis' ? 'Builder' : 'FOR')
+        : (mode === 'analysis' ? 'Stress Tester' : 'AGAINST')
+      add(`Round ${t.round_num} — ${label}`, 11, true, [80, 80, 80], 4)
+      add(t.content, 10, false, [60, 60, 60], 12)
     }
-    y += 8; add('Conclusion', 13, true, [180,180,180])
-    add('Executive Summary', 11, true, [160,160,160]); add(data.executiveSummary, 10)
-    add('Key Points FOR / PROS', 11, true, [160,160,160]); for (const p of data.keyPointsFor) add(`• ${p}`, 10)
-    add('Key Points AGAINST / CONS', 11, true, [160,160,160]); for (const p of data.keyPointsAgainst) add(`• ${p}`, 10)
-    add('Unresolved Tensions', 11, true, [160,160,160]); for (const p of data.unresolvedTensions) add(`• ${p}`, 10)
-    add('Final Verdict', 11, true, [160,160,160]); add(data.finalVerdict, 10)
-    add(`Confidence: ${data.confidenceLevel}`, 10, true, [140,140,140])
+
+    // Separator
+    addPageIfNeeded(40)
+    doc.setDrawColor(200, 200, 200)
+    doc.setLineWidth(0.5)
+    doc.line(margin, y, W - margin, y)
+    y += 16
+
+    // Conclusion section
+    add('Conclusion', 14, true, [50, 50, 50], 8)
+
+    add('Executive Summary', 12, true, [70, 70, 70], 4)
+    add(data.executiveSummary, 10, false, [60, 60, 60], 12)
+
+    const forLabel = mode === 'analysis' ? 'What Works Well' : 'Key Points FOR'
+    add(forLabel, 12, true, [70, 70, 70], 4)
+    for (const p of data.keyPointsFor) addBullet(p, 10, [60, 60, 60])
+    y += 4
+
+    const againstLabel = mode === 'analysis' ? 'Remaining Risks / Gaps' : 'Key Points AGAINST'
+    add(againstLabel, 12, true, [70, 70, 70], 4)
+    for (const p of data.keyPointsAgainst) addBullet(p, 10, [60, 60, 60])
+    y += 4
+
+    add('Unresolved Tensions', 12, true, [70, 70, 70], 4)
+    for (const p of data.unresolvedTensions) addBullet(p, 10, [60, 60, 60])
+    y += 8
+
+    // Final verdict box
+    addPageIfNeeded(80)
+    doc.setFillColor(245, 245, 245)
+    doc.roundedRect(margin, y, maxW, 60, 3, 3, 'F')
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(80, 80, 80)
+    doc.text('Final Verdict', margin + 6, y + 12)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(100, 100, 100)
+    const verdictLines = doc.splitTextToSize(data.finalVerdict, maxW - 12) as string[]
+    let vy = y + 22
+    for (const line of verdictLines) {
+      doc.text(line, margin + 6, vy)
+      vy += 12
+    }
+    // Confidence badge
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(120, 120, 120)
+    doc.text(`Confidence: ${data.confidenceLevel}`, margin + 6, vy + 6)
+
+    // Analysis-only sections
+    if (mode === 'analysis' && data.recommendedActions?.length) {
+      addPageIfNeeded(40)
+      doc.setDrawColor(200, 200, 200)
+      doc.setLineWidth(0.5)
+      doc.line(margin, y, W - margin, y)
+      y += 16
+      add('Recommended Next Steps', 14, true, [34, 130, 94], 8)
+      for (let i = 0; i < data.recommendedActions.length; i++) {
+        add(`${i + 1}. ${data.recommendedActions[i]}`, 10, false, [60, 60, 60], 4)
+      }
+    }
+
+    if (mode === 'analysis' && data.improvementSuggestions?.length) {
+      addPageIfNeeded(40)
+      add('How to Improve Further', 14, true, [59, 130, 246], 8)
+      for (let i = 0; i < data.improvementSuggestions.length; i++) {
+        add(`${i + 1}. ${data.improvementSuggestions[i]}`, 10, false, [60, 60, 60], 4)
+      }
+    }
+
     doc.save(`tusk-session-${shareSlug}.pdf`)
   }
 
@@ -164,11 +283,11 @@ export function ConclusionPanel({ conclusion, turns, topic, shareSlug, hideActio
         <p className="text-sm leading-relaxed text-white/65">{data.executiveSummary}</p>
       </motion.div>
 
-      {/* For / Against */}
+      {/* Strengths / Risks */}
       <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-2 gap-px bg-white/[0.06]">
         {[
-          { title: 'Key Points FOR / PROS',     pts: data.keyPointsFor     },
-          { title: 'Key Points AGAINST / CONS', pts: data.keyPointsAgainst },
+          { title: mode === 'analysis' ? 'What Works Well' : 'Key Points FOR / PROS',     pts: data.keyPointsFor     },
+          { title: mode === 'analysis' ? 'Remaining Risks / Gaps' : 'Key Points AGAINST / CONS', pts: data.keyPointsAgainst },
         ].map(({ title, pts }) => (
           <div key={title} className="p-5 bg-background" style={{ background: 'rgba(255,255,255,0.02)' }}>
             <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/25 mb-4">{title}</p>
@@ -199,6 +318,56 @@ export function ConclusionPanel({ conclusion, turns, topic, shareSlug, hideActio
           ))}
         </ul>
       </motion.div>
+
+      {/* Recommended Actions - analysis mode only */}
+      {mode === 'analysis' && data.recommendedActions && data.recommendedActions.length > 0 && (
+        <motion.div variants={item} className="relative p-5 overflow-hidden" style={{
+          background: 'rgba(34,197,94,0.04)',
+          border: '1px solid rgba(34,197,94,0.12)',
+        }}>
+          <div className="absolute top-0 left-0 right-0 h-px" style={{
+            background: 'linear-gradient(90deg, transparent, rgba(34,197,94,0.2), transparent)',
+          }} />
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 font-semibold mb-4">Recommended Next Steps</p>
+          <ul className="space-y-3">
+            {data.recommendedActions.map((action, i) => (
+              <li key={i} className="flex gap-3 text-xs text-white/70 font-mono leading-relaxed">
+                <span className="shrink-0 flex items-center justify-center size-5 rounded-full text-[10px] font-bold" style={{
+                  background: 'rgba(34,197,94,0.12)',
+                  color: 'rgba(34,197,94,0.7)',
+                  border: '1px solid rgba(34,197,94,0.2)',
+                }}>{i + 1}</span>
+                {action}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      )}
+
+      {/* Improvement Suggestions - analysis mode only */}
+      {mode === 'analysis' && data.improvementSuggestions && data.improvementSuggestions.length > 0 && (
+        <motion.div variants={item} className="relative p-5 overflow-hidden" style={{
+          background: 'rgba(59,130,246,0.04)',
+          border: '1px solid rgba(59,130,246,0.12)',
+        }}>
+          <div className="absolute top-0 left-0 right-0 h-px" style={{
+            background: 'linear-gradient(90deg, transparent, rgba(59,130,246,0.2), transparent)',
+          }} />
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 font-semibold mb-4">How to Improve Further</p>
+          <ul className="space-y-3">
+            {data.improvementSuggestions.map((suggestion, i) => (
+              <li key={i} className="flex gap-3 text-xs text-white/70 font-mono leading-relaxed">
+                <span className="shrink-0 flex items-center justify-center size-5 rounded-full text-[10px] font-bold" style={{
+                  background: 'rgba(59,130,246,0.12)',
+                  color: 'rgba(59,130,246,0.7)',
+                  border: '1px solid rgba(59,130,246,0.2)',
+                }}>{i + 1}</span>
+                {suggestion}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      )}
     </motion.div>
   )
 }

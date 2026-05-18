@@ -42,6 +42,8 @@ export async function POST(req: Request) {
     error_msg: null,
   })
 
+  console.log(`[api/debate/start] Session created: ${sessionId} | mode: ${mode}`)
+
   // Fire-and-forget
   runDebateAndPersist(sessionId, DEV_USER_ID, topic, rounds, '', false, mode)
     .catch(err => console.error('[dev] runDebateAndPersist error:', err))

@@ -1,6 +1,7 @@
 /**
  * DEV-ONLY in-memory store — replaces Supabase + Clerk for local testing.
  * All data lives in process memory and resets on server restart.
+ * Uses globalThis to survive Next.js hot module reloads.
  */
 
 export const DEV_USER_ID = 'dev-user-001'
@@ -34,10 +35,27 @@ export interface DevConclusion {
   created_at: string
 }
 
-// Singleton maps — survive across requests in the same process
-const sessions = new Map<string, DevSession>()
-const turns     = new Map<string, DevTurn[]>()       // keyed by session_id
-const conclusions = new Map<string, DevConclusion>() // keyed by session_id
+// Use globalThis to survive Next.js HMR / module reloads
+declare global {
+  // eslint-disable-next-line no-var
+  var __tusk_store: {
+    sessions: Map<string, DevSession>
+    turns: Map<string, DevTurn[]>
+    conclusions: Map<string, DevConclusion>
+  } | undefined
+}
+
+const store = globalThis.__tusk_store ?? {
+  sessions: new Map<string, DevSession>(),
+  turns: new Map<string, DevTurn[]>(),
+  conclusions: new Map<string, DevConclusion>(),
+}
+
+if (!globalThis.__tusk_store) {
+  globalThis.__tusk_store = store
+}
+
+const { sessions, turns, conclusions } = store
 
 // ── Sessions ──────────────────────────────────────────────────────────────
 
@@ -45,11 +63,16 @@ export function createSession(data: Omit<DevSession, 'created_at' | 'updated_at'
   const now = new Date().toISOString()
   const s: DevSession = { ...data, created_at: now, updated_at: now }
   sessions.set(s.id, s)
+  console.log(`[dev-store] Session created: ${s.id} | status: ${s.status}`)
   return s
 }
 
 export function getSession(id: string): DevSession | undefined {
-  return sessions.get(id)
+  const s = sessions.get(id)
+  if (!s) {
+    console.log(`[dev-store] getSession(${id}) → NOT FOUND (store has ${sessions.size} sessions)`)
+  }
+  return s
 }
 
 export function getSessionBySlug(slug: string): DevSession | undefined {

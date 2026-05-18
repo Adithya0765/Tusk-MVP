@@ -1,14 +1,11 @@
 import Link from 'next/link'
 import { SessionList } from '@/components/dashboard/SessionList'
-import { UsageBar } from '@/components/dashboard/UsageBar'
 import type { DbSession } from '@/types/index'
 import { Plus } from 'lucide-react'
 import { DEV_USER_ID, listSessions } from '@/lib/dev-store'
 
 export default function DashboardPage() {
   const sessions = listSessions(DEV_USER_ID)
-  const quotaUsed  = sessions.filter(s => s.status === 'complete').length
-  const quotaLimit = 3
 
   return (
     <main className="min-h-screen relative px-4 py-28 overflow-hidden bg-background">
@@ -44,14 +41,6 @@ export default function DashboardPage() {
             <Plus className="size-3.5" />
             New Session
           </Link>
-        </div>
-
-        {/* Usage */}
-        <div className="p-5" style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.07)',
-        }}>
-          <UsageBar used={quotaUsed} limit={quotaLimit} />
         </div>
 
         {/* Sessions */}

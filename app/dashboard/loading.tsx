@@ -26,22 +26,6 @@ export default function DashboardLoading() {
           <Bone className="h-9 w-28" />
         </div>
 
-        {/* Usage */}
-        <div className="p-5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <Bone className="h-3 w-24" />
-              <Bone className="h-3 w-16" />
-            </div>
-            <Bone className="h-1.5 w-full" />
-            <div className="flex justify-between">
-              <Bone className="h-2.5 w-4" />
-              <Bone className="h-2.5 w-16" />
-              <Bone className="h-2.5 w-4" />
-            </div>
-          </div>
-        </div>
-
         {/* Sessions */}
         <div>
           <Bone className="h-3 w-32 mb-4" />

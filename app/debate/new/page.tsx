@@ -83,10 +83,10 @@ export default function NewDebatePage() {
             // NEW_SESSION
           </p>
           <h1 className="text-2xl font-bold text-white/90 font-mono tracking-tight uppercase mb-2">
-            Start a Session
+            {mode === 'debate' ? 'Start a Debate' : 'Refine an Idea'}
           </h1>
           <p className="text-xs font-mono text-white/35">
-            Enter a topic or idea. The AI models will discuss it.
+            {mode === 'debate' ? 'Enter a topic. The AI models will debate it.' : 'Enter an idea. Two agents will refine it into something bulletproof.'}
           </p>
         </div>
 
@@ -116,12 +116,12 @@ export default function NewDebatePage() {
               </label>
               <label className="flex items-center gap-2 cursor-pointer text-xs font-mono text-white/70">
                 <input type="radio" value="analysis" checked={mode === 'analysis'} onChange={() => setMode('analysis')} className="accent-white/80" />
-                Idea Analysis
+                Idea Refinement
               </label>
             </div>
             <div>
               <label htmlFor="topic" className="block text-[10px] font-mono uppercase tracking-[0.2em] text-white/30 mb-3">
-                {mode === 'debate' ? 'Topic' : 'Idea'}
+                {mode === 'debate' ? 'Topic' : 'Idea to refine'}
               </label>
               <textarea
                 id="topic"
@@ -130,7 +130,7 @@ export default function NewDebatePage() {
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
                 maxLength={DEBATE_LIMITS.MAX_TOPIC_LENGTH}
-                placeholder="e.g. Remote work is better than office work"
+                placeholder={mode === 'debate' ? 'e.g. Remote work is better than office work' : 'e.g. A subscription box for indie board game designers'}
                 rows={5}
                 disabled={loading}
                 className="w-full px-4 py-3 text-sm font-mono text-white/80 placeholder-white/20 resize-none focus:outline-none disabled:opacity-50 transition-colors duration-200"

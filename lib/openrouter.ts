@@ -2,21 +2,20 @@
  * OpenRouter provider — single API key, multiple models.
  * Docs: https://openrouter.ai/docs
  *
- * Active models:
- *   Agent A (FOR)       : deepseek/deepseek-v4-flash:free
- *   Agent B (AGAINST)   : arcee-ai/trinity-large-thinking:free
- *   Conclusion          : deepseek/deepseek-v4-flash:free
+ * Active models (all free tier):
+ *   Agent A (FOR/Builder)      : deepseek/deepseek-v4-flash:free
+ *   Agent B (AGAINST/Stress)   : arcee-ai/trinity-large-thinking:free
+ *   Conclusion                 : deepseek/deepseek-v4-flash:free
  *
  * NOTE: trinity-large-thinking is a reasoning model. It wraps its thinking
  * in <think>...</think> blocks. We strip those and return only the final answer.
- * If content is empty/null, we fall back to reasoning_content (also stripped).
  */
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1/chat/completions'
 
-const MODEL_A   = 'deepseek/deepseek-v4-flash:free'
-const MODEL_B   = 'arcee-ai/trinity-large-thinking:free'
-const MODEL_CON = 'deepseek/deepseek-v4-flash:free'
+const MODEL_A   = 'meta-llama/llama-3.3-70b-instruct:free'
+const MODEL_B   = 'meta-llama/llama-3.1-70b-instruct:free'
+const MODEL_CON = 'meta-llama/llama-3.3-70b-instruct:free'
 
 function getKey(): string {
   const key = process.env.OPENROUTER_API_KEY
@@ -24,33 +23,20 @@ function getKey(): string {
   return key
 }
 
-/**
- * Strip <think>...</think> blocks (and any leading whitespace after).
- * Reasoning models emit these before the actual answer.
- */
 function stripThinking(text: string): string {
   return text
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
-    .replace(/^[\s\n]+/, '')   // trim leading whitespace left behind
+    .replace(/^[\s\n]+/, '')
     .trim()
 }
 
-/**
- * Extract the best available text from an OpenRouter response choice.
- * Handles:
- *   1. Normal models  → choices[0].message.content  (string)
- *   2. Thinking models → content may be empty; fall back to reasoning_content
- *   3. Content is an array of parts (some providers return [{type:'text',text:'...'}])
- */
 function extractContent(choice: any): string {
   const msg = choice?.message
 
-  // Helper to pull text out of a value that might be string | array | null
   function textFrom(val: unknown): string {
     if (!val) return ''
     if (typeof val === 'string') return val
     if (Array.isArray(val)) {
-      // [{type:'text', text:'...'}, {type:'thinking', thinking:'...'}]
       return val
         .filter((p: any) => p?.type === 'text' && p?.text)
         .map((p: any) => p.text as string)
@@ -60,24 +46,11 @@ function extractContent(choice: any): string {
     return ''
   }
 
-  // 1. Try content first
   const content = textFrom(msg?.content)
   if (content) return stripThinking(content)
 
-  // 2. Fall back to reasoning_content (thinking models sometimes put everything here)
   const reasoning = textFrom(msg?.reasoning_content ?? msg?.reasoning)
   if (reasoning) return stripThinking(reasoning)
-
-  // 3. Try the reasoning_details array OpenRouter sometimes returns
-  const details = msg?.reasoning_details
-  if (Array.isArray(details)) {
-    const text = details
-      .filter((d: any) => d?.type === 'text' && d?.text)
-      .map((d: any) => d.text as string)
-      .join('\n')
-      .trim()
-    if (text) return stripThinking(text)
-  }
 
   return ''
 }
@@ -108,14 +81,12 @@ async function callOpenRouter(
           { role: 'system', content: systemPrompt },
           { role: 'user',   content: userMessage  },
         ],
-        max_tokens: 600,
-        temperature: 0.8,
-        // Ask OpenRouter to include reasoning tokens in the response
+        max_tokens: 800,
+        temperature: 0.7,
         include_reasoning: true,
       }),
     })
   } catch (networkErr: any) {
-    // Network-level failure — retry
     if (retries > 1) {
       await new Promise(r => setTimeout(r, 1500))
       return callOpenRouter(model, systemPrompt, userMessage, retries - 1)
@@ -123,7 +94,6 @@ async function callOpenRouter(
     throw networkErr
   }
 
-  // Rate limited
   if (response.status === 429) {
     if (retries > 1) {
       await new Promise(r => setTimeout(r, 3000))
@@ -132,7 +102,6 @@ async function callOpenRouter(
     throw new Error('OpenRouter rate limit hit. Try again shortly.')
   }
 
-  // Transient server error
   if (response.status >= 500) {
     if (retries > 1) {
       await new Promise(r => setTimeout(r, 1500))
@@ -148,10 +117,8 @@ async function callOpenRouter(
 
   const data = await response.json()
 
-  // Top-level error object inside a 200 (OpenRouter does this for model errors)
   if (data.error) {
     const msg = data.error?.message ?? JSON.stringify(data.error)
-    // Some model errors are transient — retry once
     if (retries > 1 && (data.error?.code === 503 || data.error?.code === 'model_error')) {
       await new Promise(r => setTimeout(r, 2000))
       return callOpenRouter(model, systemPrompt, userMessage, retries - 1)
@@ -165,7 +132,6 @@ async function callOpenRouter(
   const text = extractContent(choice)
 
   if (!text) {
-    // Log the raw response to help debug future issues
     console.error('[OpenRouter] Empty content. Raw choice:', JSON.stringify(choice, null, 2))
     throw new Error(`OpenRouter returned empty content for model ${model}`)
   }
@@ -173,17 +139,14 @@ async function callOpenRouter(
   return text
 }
 
-/** Agent A — FOR side */
 export function callOpenRouterA(systemPrompt: string, userMessage: string): Promise<string> {
   return callOpenRouter(MODEL_A, systemPrompt, userMessage)
 }
 
-/** Agent B — AGAINST side */
 export function callOpenRouterB(systemPrompt: string, userMessage: string): Promise<string> {
   return callOpenRouter(MODEL_B, systemPrompt, userMessage)
 }
 
-/** Conclusion synthesizer */
 export function callOpenRouterConclusion(systemPrompt: string, userMessage: string): Promise<string> {
   return callOpenRouter(MODEL_CON, systemPrompt, userMessage)
 }

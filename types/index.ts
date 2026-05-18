@@ -85,4 +85,6 @@ export interface ConclusionData {
   unresolvedTensions: string[]
   finalVerdict: string
   confidenceLevel: 'Low' | 'Medium' | 'High'
+  recommendedActions?: string[]
+  improvementSuggestions?: string[]
 }

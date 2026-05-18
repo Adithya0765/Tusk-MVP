@@ -10,6 +10,7 @@ export async function GET(
   const session = getSession(id)
 
   if (!session) {
+    console.log(`[api/debate/${id}] Session not found`)
     return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
   }
 
@@ -24,6 +25,7 @@ export async function GET(
     }
   }
 
+  console.log(`[api/debate/${id}] Returning: status=${session.status}, turns=${turns.length}`)
   return NextResponse.json({
     session,
     turns,

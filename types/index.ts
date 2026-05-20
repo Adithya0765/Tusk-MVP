@@ -27,6 +27,114 @@ export const TIER_CONFIG: Record<Tier, TierConfig> = {
   pro:     { tier: 'pro',     label: 'Pro',        priceINR: 999, priceUSD: 12, quotaLimit: 100, rounds: 6, lemonSqueezyUrl: process.env.NEXT_PUBLIC_LS_URL_PRO },
 }
 
+// ─── Model Catalogue ─────────────────────────────────────────────────────────
+
+export type ModelId =
+  | 'qwen3-cerebras'
+  | 'llama31-cerebras'
+  | 'llama33-openrouter'
+  | 'mistral-openrouter'
+  | 'claude-haiku-openrouter'
+  | 'gpt4o-mini-openrouter'
+  | 'claude-sonnet-openrouter'
+  | 'gpt4o-openrouter'
+
+export interface ModelConfig {
+  id: ModelId
+  label: string           // display name
+  provider: string        // shown in UI
+  description: string     // one-line capability summary
+  tier: Tier              // minimum tier required
+  agentAModel: string     // provider-specific model ID for agent A
+  agentBModel: string     // provider-specific model ID for agent B
+  backend: 'cerebras' | 'openrouter'
+}
+
+export const MODEL_CATALOGUE: ModelConfig[] = [
+  {
+    id: 'qwen3-cerebras',
+    label: 'Qwen 3 vs Llama 3.1',
+    provider: 'Cerebras',
+    description: 'Ultra-fast inference. Great for quick debates.',
+    tier: 'free',
+    agentAModel: 'qwen-3-235b-a22b-instruct-2507',
+    agentBModel: 'llama3.1-8b',
+    backend: 'cerebras',
+  },
+  {
+    id: 'llama33-openrouter',
+    label: 'Llama 3.3 70B vs Mistral',
+    provider: 'OpenRouter',
+    description: 'Stronger reasoning. Better structured arguments.',
+    tier: 'starter',
+    agentAModel: 'meta-llama/llama-3.3-70b-instruct',
+    agentBModel: 'mistralai/mistral-7b-instruct',
+    backend: 'openrouter',
+  },
+  {
+    id: 'mistral-openrouter',
+    label: 'Mistral Large vs Llama 3.3',
+    provider: 'OpenRouter',
+    description: 'European AI powerhouse. Sharp, concise analysis.',
+    tier: 'starter',
+    agentAModel: 'mistralai/mistral-large',
+    agentBModel: 'meta-llama/llama-3.3-70b-instruct',
+    backend: 'openrouter',
+  },
+  {
+    id: 'claude-haiku-openrouter',
+    label: 'Claude Haiku vs GPT-4o Mini',
+    provider: 'OpenRouter',
+    description: 'Fast premium models. Nuanced, well-structured output.',
+    tier: 'starter',
+    agentAModel: 'anthropic/claude-haiku-4-5',
+    agentBModel: 'openai/gpt-4o-mini',
+    backend: 'openrouter',
+  },
+  {
+    id: 'gpt4o-mini-openrouter',
+    label: 'GPT-4o Mini vs Claude Haiku',
+    provider: 'OpenRouter',
+    description: 'OpenAI vs Anthropic. Two top-tier perspectives.',
+    tier: 'starter',
+    agentAModel: 'openai/gpt-4o-mini',
+    agentBModel: 'anthropic/claude-haiku-4-5',
+    backend: 'openrouter',
+  },
+  {
+    id: 'claude-sonnet-openrouter',
+    label: 'Claude Sonnet vs GPT-4o',
+    provider: 'OpenRouter',
+    description: 'Frontier models. Deepest reasoning and analysis.',
+    tier: 'pro',
+    agentAModel: 'anthropic/claude-sonnet-4-5',
+    agentBModel: 'openai/gpt-4o',
+    backend: 'openrouter',
+  },
+  {
+    id: 'gpt4o-openrouter',
+    label: 'GPT-4o vs Claude Sonnet',
+    provider: 'OpenRouter',
+    description: 'OpenAI flagship vs Anthropic flagship.',
+    tier: 'pro',
+    agentAModel: 'openai/gpt-4o',
+    agentBModel: 'anthropic/claude-sonnet-4-5',
+    backend: 'openrouter',
+  },
+]
+
+export function getModelsForTier(tier: Tier): ModelConfig[] {
+  const order: Tier[] = ['free', 'starter', 'pro']
+  const tierIndex = order.indexOf(tier)
+  return MODEL_CATALOGUE.filter(m => order.indexOf(m.tier) <= tierIndex)
+}
+
+export function getModel(id: ModelId): ModelConfig {
+  const m = MODEL_CATALOGUE.find(m => m.id === id)
+  if (!m) throw new Error(`Unknown model: ${id}`)
+  return m
+}
+
 export const DEBATE_LIMITS = {
   MAX_TOKENS_PER_TURN:    300,
   MAX_TURNS_PER_SESSION:  12,

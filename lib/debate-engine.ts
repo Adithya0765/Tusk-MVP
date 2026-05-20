@@ -1,6 +1,6 @@
 import { callAgentA, callAgentB, callConclusion, getAgentNames } from './ai-provider'
 import { updateSession, insertTurns, insertConclusion } from './dev-store'
-import { DEBATE_LIMITS, type ConclusionData } from '../types'
+import { DEBATE_LIMITS, type ConclusionData, type ModelConfig } from '../types'
 
 const FOR_SYSTEM_PROMPT = (topic: string) => `You are a skilled debater arguing FOR the following topic.
 Your role: Present the strongest possible case in support.
@@ -187,10 +187,11 @@ export async function runDebateAndPersist(
   rounds: number,
   _userEmail: string,
   _notifyEmail: boolean,
-  mode: 'debate' | 'analysis' = 'debate'
+  mode: 'debate' | 'analysis' = 'debate',
+  model?: ModelConfig
 ): Promise<void> {
   try {
-    const { agentA, agentB } = getAgentNames()
+    const { agentA, agentB } = getAgentNames(model)
     const turns: Turn[] = []
     let totalTurns = 0
 
@@ -211,7 +212,7 @@ export async function runDebateAndPersist(
         ? `${topicLabel}: ${topic}`
         : `${topicLabel}: ${topic}\n\nDiscussion so far:\n${transcriptSoFar}\n\nNow give your round ${round} input as ${roleA}.`
 
-      const contentA = await callWithRetry(() => callAgentA(promptA, forMessage))
+      const contentA = await callWithRetry(() => callAgentA(promptA, forMessage, model))
       turns.push({ roundNum: round, agent: 'A', agentName: agentA, role: roleA as Turn['role'], content: contentA })
       totalTurns++
       insertTurns([{ session_id: sessionId, round_num: round, agent: 'A', content: contentA, token_count: null }])
@@ -223,7 +224,7 @@ export async function runDebateAndPersist(
         .join('\n\n')
       const againstMessage = `${topicLabel}: ${topic}\n\nDiscussion so far:\n${transcriptWithA}\n\nNow give your round ${round} input as ${roleB}.`
 
-      const contentB = await callWithRetry(() => callAgentB(promptB, againstMessage))
+      const contentB = await callWithRetry(() => callAgentB(promptB, againstMessage, model))
       turns.push({ roundNum: round, agent: 'B', agentName: agentB, role: roleB as Turn['role'], content: contentB })
       totalTurns++
       insertTurns([{ session_id: sessionId, round_num: round, agent: 'B', content: contentB, token_count: null }])
@@ -235,7 +236,7 @@ export async function runDebateAndPersist(
 
     const conclusionSystemPrompt = mode === 'analysis' ? ANALYSIS_CONCLUSION : CONCLUSION_SYSTEM_PROMPT
     const conclusionRaw = await callWithRetry(() =>
-      callConclusion(conclusionSystemPrompt, `${topicLabel}: ${topic}\n\nFull transcript:\n${fullTranscript}`)
+      callConclusion(conclusionSystemPrompt, `${topicLabel}: ${topic}\n\nFull transcript:\n${fullTranscript}`, model)
     )
     const conclusion = parseConclusionJSON(conclusionRaw)
 
@@ -243,7 +244,7 @@ export async function runDebateAndPersist(
     if (mode === 'analysis') {
       try {
         const prdInput = `Idea: ${topic}\n\nRefined idea summary: ${conclusion.executiveSummary}\n\nFinal assessment: ${conclusion.finalVerdict}`
-        const prdRaw = await callWithRetry(() => callConclusion(PRD_SYSTEM_PROMPT, prdInput))
+        const prdRaw = await callWithRetry(() => callConclusion(PRD_SYSTEM_PROMPT, prdInput, model))
         const prd = parsePRDJSON(prdRaw)
         if (prd) conclusion.prd = prd
       } catch {
@@ -253,10 +254,10 @@ export async function runDebateAndPersist(
 
     insertConclusion(sessionId, JSON.stringify(conclusion))
     updateSession(sessionId, { status: 'complete' })
-  } catch (err: any) {
+  } catch (err: unknown) {
     updateSession(sessionId, {
       status: 'failed',
-      error_msg: err?.message ?? 'Unknown error',
+      error_msg: (err as Error)?.message ?? 'Unknown error',
     })
   }
 }

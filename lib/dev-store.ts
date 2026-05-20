@@ -1,7 +1,7 @@
 /**
- * DEV-ONLY in-memory store — replaces Supabase + Clerk for local testing.
- * All data lives in process memory and resets on server restart.
- * Uses globalThis to survive Next.js hot module reloads.
+ * In-memory store — used for the MVP while a persistent DB is not yet wired.
+ * Data lives in process memory and resets on server restart / cold start.
+ * Uses globalThis to survive Next.js hot module reloads in development.
  */
 
 export const DEV_USER_ID = 'dev-user-001'
@@ -35,7 +35,6 @@ export interface DevConclusion {
   created_at: string
 }
 
-// Use globalThis to survive Next.js HMR / module reloads
 declare global {
   // eslint-disable-next-line no-var
   var __tusk_store: {
@@ -51,9 +50,7 @@ const store = globalThis.__tusk_store ?? {
   conclusions: new Map<string, DevConclusion>(),
 }
 
-if (!globalThis.__tusk_store) {
-  globalThis.__tusk_store = store
-}
+if (!globalThis.__tusk_store) globalThis.__tusk_store = store
 
 const { sessions, turns, conclusions } = store
 
@@ -63,16 +60,11 @@ export function createSession(data: Omit<DevSession, 'created_at' | 'updated_at'
   const now = new Date().toISOString()
   const s: DevSession = { ...data, created_at: now, updated_at: now }
   sessions.set(s.id, s)
-  console.log(`[dev-store] Session created: ${s.id} | status: ${s.status}`)
   return s
 }
 
 export function getSession(id: string): DevSession | undefined {
-  const s = sessions.get(id)
-  if (!s) {
-    console.log(`[dev-store] getSession(${id}) → NOT FOUND (store has ${sessions.size} sessions)`)
-  }
-  return s
+  return sessions.get(id)
 }
 
 export function getSessionBySlug(slug: string): DevSession | undefined {
@@ -94,7 +86,8 @@ export function listSessions(userId: string): DevSession[] {
 }
 
 export function countProcessing(userId: string): number {
-  return [...sessions.values()].filter(s => s.user_id === userId && s.status === 'processing').length
+  return [...sessions.values()]
+    .filter(s => s.user_id === userId && s.status === 'processing').length
 }
 
 // ── Turns ─────────────────────────────────────────────────────────────────

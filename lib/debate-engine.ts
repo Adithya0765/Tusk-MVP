@@ -133,8 +133,7 @@ function parseConclusionJSON(raw: string): ConclusionData {
   }
 
   console.error('[debate] Failed to parse conclusion JSON. Raw:', raw.slice(0, 300))
-  return {
-    executiveSummary: 'The session completed but the verdict could not be formatted.',
+  return {    executiveSummary: 'The session completed but the verdict could not be formatted.',
     keyPointsFor: ['See transcript for details'],
     keyPointsAgainst: ['See transcript for details'],
     unresolvedTensions: ['Conclusion parsing failed'],
@@ -190,7 +189,6 @@ export async function runDebateAndPersist(
   _notifyEmail: boolean,
   mode: 'debate' | 'analysis' = 'debate'
 ): Promise<void> {
-  console.log(`[debate] Starting session ${sessionId} | mode: ${mode} | rounds: ${rounds}`)
   try {
     const { agentA, agentB } = getAgentNames()
     const turns: Turn[] = []
@@ -205,7 +203,6 @@ export async function runDebateAndPersist(
     for (let round = 1; round <= rounds; round++) {
       if (totalTurns >= DEBATE_LIMITS.MAX_TURNS_PER_SESSION) break
 
-      console.log(`[debate] Round ${round} — calling Agent A...`)
       const transcriptSoFar = turns
         .map(t => `[${t.agentName} — ${t.role}]: ${t.content}`)
         .join('\n\n')
@@ -215,7 +212,6 @@ export async function runDebateAndPersist(
         : `${topicLabel}: ${topic}\n\nDiscussion so far:\n${transcriptSoFar}\n\nNow give your round ${round} input as ${roleA}.`
 
       const contentA = await callWithRetry(() => callAgentA(promptA, forMessage))
-      console.log(`[debate] Round ${round} Agent A done (${contentA.length} chars)`)
       turns.push({ roundNum: round, agent: 'A', agentName: agentA, role: roleA as Turn['role'], content: contentA })
       totalTurns++
       insertTurns([{ session_id: sessionId, round_num: round, agent: 'A', content: contentA, token_count: null }])
@@ -227,15 +223,12 @@ export async function runDebateAndPersist(
         .join('\n\n')
       const againstMessage = `${topicLabel}: ${topic}\n\nDiscussion so far:\n${transcriptWithA}\n\nNow give your round ${round} input as ${roleB}.`
 
-      console.log(`[debate] Round ${round} — calling Agent B...`)
       const contentB = await callWithRetry(() => callAgentB(promptB, againstMessage))
-      console.log(`[debate] Round ${round} Agent B done (${contentB.length} chars)`)
       turns.push({ roundNum: round, agent: 'B', agentName: agentB, role: roleB as Turn['role'], content: contentB })
       totalTurns++
       insertTurns([{ session_id: sessionId, round_num: round, agent: 'B', content: contentB, token_count: null }])
     }
 
-    console.log(`[debate] All rounds done, generating conclusion...`)
     const fullTranscript = turns
       .map(t => `[${t.agentName} — ${t.role}, Round ${t.roundNum}]: ${t.content}`)
       .join('\n\n')
@@ -246,29 +239,21 @@ export async function runDebateAndPersist(
     )
     const conclusion = parseConclusionJSON(conclusionRaw)
 
-    // PRD: only for analysis mode. Input is just the refined idea + the verdict/summary —
-    // intentionally small so Cerebras never hits token limits.
+    // PRD: analysis mode only — uses just the verdict/summary as input to keep the prompt small
     if (mode === 'analysis') {
-      console.log(`[debate] Generating PRD from verdict...`)
       try {
         const prdInput = `Idea: ${topic}\n\nRefined idea summary: ${conclusion.executiveSummary}\n\nFinal assessment: ${conclusion.finalVerdict}`
         const prdRaw = await callWithRetry(() => callConclusion(PRD_SYSTEM_PROMPT, prdInput))
-        console.log(`[debate] PRD raw (first 200 chars):`, prdRaw.slice(0, 200))
         const prd = parsePRDJSON(prdRaw)
-        if (prd) {
-          conclusion.prd = prd
-          console.log(`[debate] PRD attached, keys:`, Object.keys(prd))
-        }
-      } catch (prdErr: any) {
-        console.error('[debate] PRD generation failed (non-fatal):', prdErr?.message)
+        if (prd) conclusion.prd = prd
+      } catch {
+        // Non-fatal — session still completes without PRD
       }
     }
 
     insertConclusion(sessionId, JSON.stringify(conclusion))
     updateSession(sessionId, { status: 'complete' })
-    console.log(`[debate] Session ${sessionId} marked complete`)
   } catch (err: any) {
-    console.error(`[debate] Session ${sessionId} failed:`, err?.message ?? err)
     updateSession(sessionId, {
       status: 'failed',
       error_msg: err?.message ?? 'Unknown error',

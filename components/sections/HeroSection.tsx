@@ -198,8 +198,8 @@ function DebatePreviewCard() {
           </div>
 
           {[
-            { label: 'FOR',     agent: 'Gemini', text: 'AI judges eliminate human bias. Sentencing varies by mood and time of day…' },
-            { label: 'AGAINST', agent: 'Grok',   text: 'Justice requires empathy no algorithm can replicate…' },
+            { label: 'FOR',     agent: 'Qwen 3',   text: 'AI judges eliminate human bias. Sentencing varies by mood and time of day…' },
+            { label: 'AGAINST', agent: 'Llama 3.1', text: 'Justice requires empathy no algorithm can replicate…' },
           ].map((t, i) => (
             <motion.div 
               key={i} 

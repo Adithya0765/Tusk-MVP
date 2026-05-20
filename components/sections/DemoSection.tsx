@@ -8,15 +8,15 @@ const DEMO_TOPIC = 'Should AI replace human judges in courtrooms?'
 
 const TURNS = [
   {
-    agent: 'A' as const, agentName: 'Gemini', round: 1, label: 'PRO',
+    agent: 'A' as const, agentName: 'Qwen 3', round: 1, label: 'PRO',
     content: "AI judges would eliminate human bias from sentencing. Studies show outcomes vary based on the judge's mood, race of the defendant, and time of day. An AI trained on consistent legal principles would apply the law uniformly — equal treatment regardless of who stands before the bench.",
   },
   {
-    agent: 'B' as const, agentName: 'Grok', round: 1, label: 'CON',
+    agent: 'B' as const, agentName: 'Llama 3.1', round: 1, label: 'CON',
     content: "Justice requires human empathy and contextual understanding no AI can replicate. A judge must weigh remorse, life circumstances, and the human story behind each case. Algorithmic sentencing risks encoding historical biases at scale — perpetuating systemic inequalities rather than correcting them.",
   },
   {
-    agent: 'A' as const, agentName: 'Gemini', round: 2, label: 'PRO',
+    agent: 'A' as const, agentName: 'Qwen 3', round: 2, label: 'PRO',
     content: "The bias concern is valid but solvable through careful dataset curation and ongoing audits — unlike human bias, which is invisible and unauditable. AI systems can be transparent: every decision can be explained, logged, and challenged. Human judges operate as black boxes.",
   },
 ]
@@ -92,8 +92,8 @@ export function DemoSection() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full flex-1 z-10">
                 {[
-                  { id: 'A', name: 'Gemini', label: 'Analyst', color: 'from-blue-500/10 to-blue-900/5', border: 'border-blue-500/20', accent: 'bg-blue-500', text: TURNS[2].content },
-                  { id: 'B', name: 'Grok', label: 'Critic', color: 'from-orange-500/10 to-orange-900/5', border: 'border-orange-500/20', accent: 'bg-orange-500', text: TURNS[1].content }
+                  { id: 'A', name: 'Qwen 3',    label: 'Analyst', color: 'from-blue-500/10 to-blue-900/5', border: 'border-blue-500/20', accent: 'bg-blue-500', text: TURNS[2].content },
+                  { id: 'B', name: 'Llama 3.1', label: 'Critic',  color: 'from-orange-500/10 to-orange-900/5', border: 'border-orange-500/20', accent: 'bg-orange-500', text: TURNS[1].content }
                 ].map((agent) => (
                   <div key={agent.id} className={`relative rounded-xl overflow-hidden bg-black border ${agent.border} flex flex-col items-center justify-start p-6 shadow-xl w-full max-w-sm mx-auto`}>
                     <div className={`absolute inset-0 bg-gradient-to-b ${agent.color} opacity-30 pointer-events-none`} />

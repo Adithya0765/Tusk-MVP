@@ -3,8 +3,8 @@
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { TIER_CONFIG, type Tier } from '@/types/index'
-import { Button } from '@/components/ui/button'
-import { Check, Sparkles, Zap, Crown, ChevronRight } from 'lucide-react'
+import { Check, ChevronRight, Zap, Users, Crown } from 'lucide-react'
+import { motion } from 'motion/react'
 
 interface PricingTableProps {
   currentTier?: Tier
@@ -12,63 +12,46 @@ interface PricingTableProps {
 }
 
 const TIER_META: Record<Tier, {
-  icon: typeof Sparkles
-  iconColor: string
-  accentColor: string
-  gradientFrom: string
-  gradientTo: string
-  borderColor: string
-  glowColor: string
-  badgeGradient: string
+  icon: typeof Zap
+  tagline: string
   features: string[]
+  highlight: boolean
 }> = {
   free: {
     icon: Zap,
-    iconColor: 'text-violet-400',
-    accentColor: 'rgba(139, 92, 246, 0.6)',
-    gradientFrom: 'from-violet-600/20',
-    gradientTo: 'to-indigo-600/20',
-    borderColor: 'border-purple-500/15',
-    glowColor: 'rgba(139, 92, 246, 0.15)',
-    badgeGradient: '',
+    tagline: 'Try it out, no strings attached.',
     features: [
-      'Gemini 2.0 Flash vs Grok 3 Mini',
+      '3 sessions per month',
+      '3 rounds per session',
+      'Debate & Idea Refinement modes',
       'PDF & Markdown export',
-      'Shareable debate links',
-      'Email notifications',
+      'Shareable session links',
     ],
+    highlight: false,
   },
   starter: {
-    icon: Sparkles,
-    iconColor: 'text-blue-400',
-    accentColor: 'rgba(59, 130, 246, 0.6)',
-    gradientFrom: 'from-blue-600/20',
-    gradientTo: 'to-cyan-600/20',
-    borderColor: 'border-blue-500/15',
-    glowColor: 'rgba(59, 130, 246, 0.15)',
-    badgeGradient: '',
+    icon: Users,
+    tagline: 'For builders who think daily.',
     features: [
+      '30 sessions per month',
+      '4 rounds per session',
       'Everything in Explorer',
-      'More debate rounds',
+      'PRD generation for ideas',
       'Priority processing',
-      'Debate history',
     ],
+    highlight: true,
   },
   pro: {
     icon: Crown,
-    iconColor: 'text-amber-400',
-    accentColor: 'rgba(245, 158, 11, 0.6)',
-    gradientFrom: 'from-amber-500/20',
-    gradientTo: 'to-orange-500/20',
-    borderColor: 'border-amber-500/20',
-    glowColor: 'rgba(245, 158, 11, 0.2)',
-    badgeGradient: 'from-amber-500 to-orange-500',
+    tagline: 'Maximum depth, maximum output.',
     features: [
-      'Everything in Builder',
-      'Maximum debate rounds',
-      'Unlimited debate history',
+      '100 sessions per month',
+      '6 rounds per session',
+      'Everything in Community',
       'Early access to new models',
+      'Debate history & search',
     ],
+    highlight: false,
   },
 }
 
@@ -80,6 +63,12 @@ export function PricingTable({ currentTier, isAuthenticated }: PricingTableProps
       router.push('/sign-up')
       return
     }
+    const config = TIER_CONFIG[tier]
+    // If we have the LS URL directly, skip the API call and go straight there
+    if (config.lemonSqueezyUrl) {
+      window.location.href = config.lemonSqueezyUrl
+      return
+    }
     const res = await fetch('/api/subscription/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -87,139 +76,110 @@ export function PricingTable({ currentTier, isAuthenticated }: PricingTableProps
     })
     if (res.ok) {
       const { url } = await res.json()
-      router.push(url)
+      if (url) window.location.href = url
     }
   }
 
   const tiers: Tier[] = ['free', 'starter', 'pro']
 
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-3 items-start">
-      {tiers.map((tier) => {
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-white/[0.06]">
+      {tiers.map((tier, i) => {
         const config = TIER_CONFIG[tier]
         const meta = TIER_META[tier]
-        const isPro = tier === 'pro'
         const isCurrent = currentTier === tier
         const Icon = meta.icon
 
         return (
-          <div
+          <motion.div
             key={tier}
-            className={`relative rounded-2xl transition-all duration-500 hover:-translate-y-2 ${isPro ? 'md:scale-105 md:z-10' : ''}`}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: i * 0.08, ease: [0.23, 1, 0.32, 1] }}
+            className="relative flex flex-col"
             style={{
-              background: 'linear-gradient(135deg, rgba(15,10,30,0.85) 0%, rgba(20,15,40,0.7) 100%)',
-              backdropFilter: 'blur(20px)',
-              border: `1px solid ${isPro ? 'rgba(245,158,11,0.25)' : 'rgba(139,92,246,0.15)'}`,
-              boxShadow: isPro
-                ? `0 0 0 1px rgba(245,158,11,0.1), 0 20px 60px rgba(245,158,11,0.1), inset 0 1px 0 rgba(255,255,255,0.05)`
-                : `0 20px 60px rgba(139,92,246,0.08), inset 0 1px 0 rgba(255,255,255,0.03)`,
+              background: meta.highlight
+                ? 'rgba(255,255,255,0.04)'
+                : 'rgba(255,255,255,0.015)',
             }}
           >
-            {/* Top glow line */}
-            <div
-              className="absolute top-0 left-1/2 -translate-x-1/2 h-px rounded-full opacity-60"
-              style={{
-                width: '60%',
-                background: `linear-gradient(90deg, transparent, ${meta.accentColor}, transparent)`,
-              }}
-            />
+            {/* Highlight top line */}
+            {meta.highlight && (
+              <div className="absolute top-0 left-0 right-0 h-px" style={{
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
+              }} />
+            )}
 
-            {/* Most Popular badge */}
-            {isPro && (
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-white bg-gradient-to-r ${meta.badgeGradient}`}
-                  style={{ boxShadow: '0 0 20px rgba(245,158,11,0.5)' }}
-                >
-                  <Sparkles className="size-3" />
+            {/* Most popular badge */}
+            {meta.highlight && (
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                <span className="inline-flex items-center gap-1 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-black font-bold bg-white">
                   Most Popular
                 </span>
               </div>
             )}
 
-            <div className="p-7">
-              {/* Header */}
+            <div className="p-8 flex flex-col flex-1">
+              {/* Icon + label */}
               <div className="flex items-center gap-3 mb-6">
-                <div
-                  className={`flex items-center justify-center size-12 rounded-xl bg-gradient-to-br ${meta.gradientFrom} ${meta.gradientTo}`}
-                  style={{ border: `1px solid ${meta.glowColor}` }}
-                >
-                  <Icon className={`size-6 ${meta.iconColor}`} />
+                <div className="flex items-center justify-center size-9" style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                }}>
+                  <Icon className="size-4 text-white/60" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">{config.label}</h3>
-                  <p className="text-xs text-purple-300/50 font-mono uppercase tracking-wider">{tier}</p>
+                  <p className="text-sm font-mono font-bold text-white/90 uppercase tracking-wider">
+                    {config.label}
+                  </p>
+                  <p className="text-[10px] font-mono text-white/30">{meta.tagline}</p>
                 </div>
               </div>
 
               {/* Price */}
-              <div className="mb-6">
+              <div className="mb-8">
                 <div className="flex items-baseline gap-1">
-                  <span
-                    className="text-5xl font-black tracking-tight"
-                    style={{
-                      background: isPro
-                        ? 'linear-gradient(135deg, #fbbf24, #f59e0b)'
-                        : tier === 'starter'
-                        ? 'linear-gradient(135deg, #60a5fa, #3b82f6)'
-                        : 'linear-gradient(135deg, #a78bfa, #8b5cf6)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                    }}
-                  >
-                    {config.priceINR === 0 ? 'Free' : `₹${config.priceINR}`}
+                  <span className="text-5xl font-black font-mono text-white/90">
+                    {config.priceUSD === 0 ? 'Free' : `$${config.priceUSD}`}
                   </span>
-                  {config.priceINR > 0 && (
-                    <span className="text-sm text-purple-300/40 font-medium">/month</span>
+                  {config.priceUSD > 0 && (
+                    <span className="text-sm font-mono text-white/30">/mo</span>
                   )}
                 </div>
-                {config.priceINR === 0 && (
-                  <p className="text-xs text-purple-300/40 mt-1">No credit card required</p>
+                {config.priceUSD === 0 && (
+                  <p className="text-[10px] font-mono text-white/25 mt-1 uppercase tracking-widest">
+                    No card required
+                  </p>
+                )}
+                {config.priceUSD > 0 && (
+                  <p className="text-[10px] font-mono text-white/25 mt-1 uppercase tracking-widest">
+                    Billed monthly · Cancel anytime
+                  </p>
                 )}
               </div>
 
-              {/* Quota & Rounds stats */}
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div
-                  className="rounded-xl px-3 py-3 text-center"
-                  style={{
-                    background: 'rgba(139,92,246,0.06)',
-                    border: '1px solid rgba(139,92,246,0.12)',
-                  }}
-                >
-                  <p className="text-xl font-bold text-white">{config.quotaLimit}</p>
-                  <p className="text-xs text-purple-300/50 mt-0.5">debates/mo</p>
-                </div>
-                <div
-                  className="rounded-xl px-3 py-3 text-center"
-                  style={{
-                    background: 'rgba(139,92,246,0.06)',
-                    border: '1px solid rgba(139,92,246,0.12)',
-                  }}
-                >
-                  <p className="text-xl font-bold text-white">{config.rounds}</p>
-                  <p className="text-xs text-purple-300/50 mt-0.5">rounds</p>
-                </div>
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-2 mb-8">
+                {[
+                  { value: config.quotaLimit === 9999 ? '∞' : String(config.quotaLimit), label: 'sessions/mo' },
+                  { value: String(config.rounds), label: 'rounds' },
+                ].map(stat => (
+                  <div key={stat.label} className="px-3 py-2.5 text-center" style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                  }}>
+                    <p className="text-lg font-black font-mono text-white/90">{stat.value}</p>
+                    <p className="text-[9px] font-mono text-white/30 uppercase tracking-widest mt-0.5">{stat.label}</p>
+                  </div>
+                ))}
               </div>
 
-              {/* Divider */}
-              <div
-                className="h-px mb-6"
-                style={{ background: 'linear-gradient(90deg, transparent, rgba(139,92,246,0.2), transparent)' }}
-              />
-
               {/* Features */}
-              <ul className="space-y-3 mb-7">
-                {meta.features.map((feature, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm text-white/75">
-                    <div
-                      className="flex items-center justify-center size-5 rounded-full shrink-0 mt-0.5"
-                      style={{ background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.3)' }}
-                    >
-                      <Check className="size-3 text-green-400" />
-                    </div>
-                    <span>{feature}</span>
+              <ul className="space-y-2.5 mb-8 flex-1">
+                {meta.features.map((feature, fi) => (
+                  <li key={fi} className="flex items-start gap-2.5 text-xs font-mono text-white/55">
+                    <Check className="size-3.5 shrink-0 mt-0.5 text-white/30" />
+                    {feature}
                   </li>
                 ))}
               </ul>
@@ -227,63 +187,38 @@ export function PricingTable({ currentTier, isAuthenticated }: PricingTableProps
               {/* CTA */}
               {tier === 'free' ? (
                 isCurrent ? (
-                  <Button
-                    variant="outline"
-                    disabled
-                    className="w-full"
-                    style={{ borderColor: 'rgba(139,92,246,0.2)', color: 'rgba(167,139,250,0.5)' }}
-                  >
+                  <div className="w-full py-3 text-center text-xs font-mono text-white/25 uppercase tracking-widest" style={{
+                    border: '1px solid rgba(255,255,255,0.08)',
+                  }}>
                     Current Plan
-                  </Button>
+                  </div>
                 ) : (
-                  <Button
-                    variant="outline"
-                    asChild
-                    className="w-full group"
-                    style={{ borderColor: 'rgba(139,92,246,0.3)', color: '#a78bfa' }}
+                  <Link
+                    href="/sign-up"
+                    className="group w-full flex items-center justify-center gap-2 py-3 text-xs font-mono uppercase tracking-widest text-white/60 hover:text-white/90 transition-colors"
+                    style={{ border: '1px solid rgba(255,255,255,0.12)' }}
                   >
-                    <Link href="/sign-up">
-                      Get Started Free
-                      <ChevronRight className="size-4 group-hover:translate-x-0.5 transition-transform" />
-                    </Link>
-                  </Button>
+                    Get Started Free
+                    <ChevronRight className="size-3.5 group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
                 )
               ) : isCurrent ? (
-                <Button
-                  variant="outline"
-                  disabled
-                  className="w-full"
-                  style={{ borderColor: 'rgba(139,92,246,0.2)', color: 'rgba(167,139,250,0.5)' }}
-                >
+                <div className="w-full py-3 text-center text-xs font-mono text-white/25 uppercase tracking-widest" style={{
+                  border: '1px solid rgba(255,255,255,0.08)',
+                }}>
                   Current Plan
-                </Button>
+                </div>
               ) : (
                 <button
                   onClick={() => handleUpgrade(tier)}
-                  className="w-full group relative overflow-hidden rounded-xl px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-                  style={{
-                    background: isPro
-                      ? 'linear-gradient(135deg, #f59e0b, #d97706)'
-                      : 'linear-gradient(135deg, #7c3aed, #4f46e5)',
-                    boxShadow: isPro
-                      ? '0 0 30px rgba(245,158,11,0.35)'
-                      : '0 0 30px rgba(124,58,237,0.35)',
-                  }}
+                  className="btn-primary group w-full flex items-center justify-center gap-2 py-3 text-xs"
                 >
-                  <span className="relative z-10 flex items-center justify-center gap-2">
-                    {isAuthenticated ? 'Upgrade Now' : 'Get Started'}
-                    <ChevronRight className="size-4 group-hover:translate-x-0.5 transition-transform" />
-                  </span>
-                  {/* Shimmer overlay */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                    style={{
-                      background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%)',
-                    }}
-                  />
+                  {isAuthenticated ? 'Upgrade Now' : 'Get Started'}
+                  <ChevronRight className="size-3.5 group-hover:translate-x-0.5 transition-transform" />
                 </button>
               )}
             </div>
-          </div>
+          </motion.div>
         )
       })}
     </div>

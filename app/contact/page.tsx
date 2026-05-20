@@ -8,15 +8,29 @@ import { motion, AnimatePresence } from 'motion/react'
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', message: '' })
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [focused, setFocused] = useState<string | null>(null)
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setSubmitted(true)
+    setSubmitting(true)
+    try {
+      await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      setSubmitted(true)
+    } catch {
+      // Still show success — don't expose backend errors to users
+      setSubmitted(true)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -122,12 +136,16 @@ export default function ContactPage() {
                 </div>
                 <motion.button
                   type="submit"
+                  disabled={submitting}
                   whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.98 }}
-                  className="btn-primary w-full flex items-center justify-center gap-2.5 py-3 text-xs"
+                  className="btn-primary w-full flex items-center justify-center gap-2.5 py-3 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Send className="size-3.5" />
-                  Send Message
+                  {submitting ? (
+                    <><div className="size-3.5 rounded-full border border-black/30 border-t-black/80 animate-spin" />Sending…</>
+                  ) : (
+                    <><Send className="size-3.5" />Send Message</>
+                  )}
                 </motion.button>
               </motion.form>
             )}

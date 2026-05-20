@@ -1,58 +1,43 @@
-import { Resend } from 'resend'
-import { createServerClient } from './supabase'
+/**
+ * Email notifications via Resend.
+ * Set RESEND_API_KEY and RESEND_FROM_EMAIL in your environment to enable.
+ * If keys are missing, sendDebateNotification is a no-op.
+ */
 
-function getResendClient(): Resend {
-  const key = process.env.RESEND_API_KEY
-  if (!key) throw new Error('Missing RESEND_API_KEY')
-  return new Resend(key)
-}
-
-/** Escape HTML special characters to prevent injection in emails */
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 export async function sendDebateNotification(
   to: string,
   sessionId: string,
   status: 'complete' | 'failed'
-): Promise<{ success: boolean; error?: string }> {
+): Promise<void> {
+  const key = process.env.RESEND_API_KEY
+  if (!key || !to) return
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  const debateUrl = `${appUrl}/debate/${sessionId}`
-  const from = process.env.RESEND_FROM_EMAIL ?? 'debates@tusk.ai'
+  const from = process.env.RESEND_FROM_EMAIL ?? 'noreply@tusk.ai'
+  const url = escapeHtml(`${appUrl}/debate/${sessionId}`)
 
-  const subject =
-    status === 'complete'
-      ? '✅ Your TUSK debate is ready'
-      : '❌ Your TUSK debate encountered an error'
+  const subject = status === 'complete'
+    ? 'Your TUSK session is ready'
+    : 'Your TUSK session encountered an error'
 
-  const safeDebateUrl = escapeHtml(debateUrl)
+  const html = status === 'complete'
+    ? `<p>Your session has finished. <a href="${url}">View the results →</a></p>`
+    : `<p>Your session failed to complete. <a href="${url}">View details →</a></p>`
 
-  const html =
-    status === 'complete'
-      ? `<p>Your debate has finished! <a href="${safeDebateUrl}">View the results →</a></p>`
-      : `<p>Your debate failed to complete. <a href="${safeDebateUrl}">View details and try again →</a></p>`
-
-  const supabase = createServerClient()
-  let sendError: string | undefined
-
-  try {
-    const resend = getResendClient()
-    const { error } = await resend.emails.send({ from, to, subject, html })
-    if (error) sendError = error.message
-  } catch (err: any) {
-    sendError = err?.message ?? 'Unknown error'
-  }
-
-  // Always log the attempt — success or failure
-  await supabase.from('notifications_log').insert({
-    session_id: sessionId,
-    recipient: to,
-    status: sendError ? 'failed' : 'sent',
-    error_msg: sendError ?? null,
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to, subject, html }),
+  }).catch(() => {
+    // Non-fatal — email failure should never break the debate flow
   })
-
-  return sendError
-    ? { success: false, error: sendError }
-    : { success: true }
 }

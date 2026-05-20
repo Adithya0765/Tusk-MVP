@@ -110,16 +110,6 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-bold text-white/90 font-mono uppercase tracking-tight">Account</h1>
         </motion.div>
 
-        {/* Dev banner */}
-        <motion.div variants={item} className="flex items-center gap-3 px-4 py-3" style={{
-          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-        }}>
-          <div className="size-1.5 rounded-full bg-amber-400/60" />
-          <p className="text-[10px] font-mono text-white/30 uppercase tracking-widest">
-            Dev mode — changes reset on server restart
-          </p>
-        </motion.div>
-
         {/* Display Name */}
         <motion.div variants={item}>
           <Section className="p-5 space-y-4">
@@ -205,7 +195,6 @@ export default function SettingsPage() {
                 {[
                   { label: 'Email', value: user.email },
                   { label: 'Plan',  value: user.tier.charAt(0).toUpperCase() + user.tier.slice(1) },
-                  { label: 'Mode',  value: 'Dev (no auth)' },
                 ].map(row => (
                   <div key={row.label} className="flex items-center justify-between py-2" style={{
                     borderBottom: '1px solid rgba(255,255,255,0.05)',

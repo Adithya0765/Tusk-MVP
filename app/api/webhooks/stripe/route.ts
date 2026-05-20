@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-// Dev mode: Stripe webhooks disabled
+// Stripe not used — payments handled via Lemon Squeezy
 export async function POST() {
-  return NextResponse.json({ message: 'Stripe webhooks disabled in dev mode' }, { status: 200 })
+  return NextResponse.json({ message: 'Not used' }, { status: 200 })
 }

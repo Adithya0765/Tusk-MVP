@@ -14,14 +14,17 @@ export interface TierConfig {
   tier: Tier
   label: string
   priceINR: number
+  priceUSD: number
   quotaLimit: number
   rounds: number
+  stripePriceId?: string
+  lemonSqueezyUrl?: string
 }
 
 export const TIER_CONFIG: Record<Tier, TierConfig> = {
-  free:    { tier: 'free',    label: 'Explorer', priceINR: 0,   quotaLimit: 9999, rounds: 4 },
-  starter: { tier: 'starter', label: 'Builder',  priceINR: 299, quotaLimit: 20,   rounds: 3 },
-  pro:     { tier: 'pro',     label: 'Pro',       priceINR: 799, quotaLimit: 60,   rounds: 5 },
+  free:    { tier: 'free',    label: 'Explorer',  priceINR: 0,   priceUSD: 0,  quotaLimit: 3,   rounds: 3 },
+  starter: { tier: 'starter', label: 'Community', priceINR: 349, priceUSD: 4,  quotaLimit: 30,  rounds: 4, lemonSqueezyUrl: process.env.NEXT_PUBLIC_LS_URL_COMMUNITY },
+  pro:     { tier: 'pro',     label: 'Pro',        priceINR: 999, priceUSD: 12, quotaLimit: 100, rounds: 6, lemonSqueezyUrl: process.env.NEXT_PUBLIC_LS_URL_PRO },
 }
 
 export const DEBATE_LIMITS = {

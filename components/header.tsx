@@ -51,6 +51,7 @@ export const HeroHeader = () => {
           <div className="hidden lg:flex items-center gap-1">
             <NavLink href="/dashboard">Dashboard</NavLink>
             <NavLink href="/debate/new">New Session</NavLink>
+            <NavLink href="/pricing">Pricing</NavLink>
             <NavLink href="/#how-it-works">How It Works</NavLink>
           </div>
 
@@ -91,6 +92,7 @@ export const HeroHeader = () => {
             >
               <MobileNavLink href="/dashboard"     onClick={() => setMenuOpen(false)}>Dashboard</MobileNavLink>
               <MobileNavLink href="/debate/new"    onClick={() => setMenuOpen(false)}>New Session</MobileNavLink>
+              <MobileNavLink href="/pricing"       onClick={() => setMenuOpen(false)}>Pricing</MobileNavLink>
               <MobileNavLink href="/#how-it-works" onClick={() => setMenuOpen(false)}>How It Works</MobileNavLink>
               <div className="pt-2">
                 <Link
